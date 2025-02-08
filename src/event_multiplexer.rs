@@ -50,7 +50,7 @@ macro_rules! define_event_multiplexer {
                             }
                         )*
                         _ = tokio::time::sleep(std::time::Duration::from_secs(timeout)) => {
-                            log::warn!("Timeout waiting for events");
+                            log::debug!("Timeout waiting for events");
                             $enum_name::Timeout
                         },
                         else => {
