@@ -1,0 +1,26 @@
+[package]
+name = "hc-homie5"
+version = "0.1.0"
+edition = "2021"
+publish = true
+description = "Provides higher level function implementation for homie5 homie devices (discovery and device implementation)."
+repository = "https://github.com/homie-homecontrol/hc-homie5"
+license = "MIT"
+authors = ["schaze <schazet@gmail.com>"]
+readme = "README.md"
+keywords = ["homie", "homecontrol", "iot", "mqtt", "homie5"]
+
+[dependencies]
+log = "0.4.22"
+rumqttc = "0.24.0"
+thiserror = "2.0.9"
+tokio = { version = "1.42.0", features = ["full"] }
+serde = { version = "1.0.214", features = ["derive"] }
+tokio-util = "0.7.13"
+paste = "1.0.15"
+rand = "0.9.0"
+homie5 = "0.5.0"
+hc-homie5-macros = "0.1.1"
+
+[dev-dependencies]
+serde_yml = "0.0.12"
