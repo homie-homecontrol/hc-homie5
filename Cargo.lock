@@ -252,9 +252,9 @@ dependencies = [
 
 [[package]]
 name = "homie5"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdb64b4d1547511926514edbea3861d884c1e7a5049aed9ce04cd97898bd00b5"
+checksum = "75a42df2e83529272c3db933f618028435a77db9c515b3a2e06247a9d640a1d9"
 dependencies = [
  "chrono",
  "log",
