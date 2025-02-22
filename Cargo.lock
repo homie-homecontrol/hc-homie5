@@ -230,6 +230,7 @@ dependencies = [
  "log",
  "paste",
  "rand",
+ "regex",
  "rumqttc",
  "serde",
  "serde_yml",
