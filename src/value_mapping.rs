@@ -1,12 +1,12 @@
-use crate::value_condition::ValueCondition;
+use crate::{value_condition::ValueCondition, ValueMatcher};
 use serde::Deserialize;
 use std::ops::Deref;
 
 #[derive(Copy, Clone)]
 pub enum MappingResult<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: std::fmt::Debug,
+    TO: std::fmt::Debug,
 {
     Mapped(TO),
     Unmapped(FROM),
@@ -14,8 +14,8 @@ where
 
 impl<FROM, TO> MappingResult<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: std::fmt::Debug,
+    TO: std::fmt::Debug,
 {
     #[allow(dead_code)]
     pub fn is_unmapped(&self) -> bool {
@@ -59,8 +59,8 @@ where
 
 impl<FROM, TO> MappingResult<&FROM, &TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug + Clone,
-    TO: PartialEq + PartialOrd + std::fmt::Debug + Clone,
+    FROM: std::fmt::Debug + Clone,
+    TO: std::fmt::Debug + Clone,
 {
     pub fn cloned(self) -> MappingResult<FROM, TO> {
         match self {
@@ -72,8 +72,8 @@ where
 
 impl<FROM, TO> MappingResult<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: std::fmt::Debug,
+    TO: std::fmt::Debug,
     FROM: Into<TO>,
 {
     /// Converts `Unmapped(FROM)` into `TO` if `FROM` can be converted into `TO`.
@@ -88,8 +88,8 @@ where
 #[derive(Debug, Clone, Deserialize)]
 pub struct ValueMapping<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    TO: std::fmt::Debug,
 {
     #[serde(default = "default_none")]
     pub from: Option<ValueCondition<FROM>>,
@@ -99,15 +99,15 @@ where
 // Helper function to provide a default value for `Option` fields
 fn default_none<FROM>() -> Option<ValueCondition<FROM>>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
 {
     None
 }
 
 impl<FROM, TO> ValueMapping<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    TO: std::fmt::Debug,
 {
     pub fn map_to<'a>(&'a self, value: &'a FROM) -> MappingResult<&'a FROM, &'a TO> {
         if self.from.is_none() {
@@ -123,13 +123,13 @@ where
 #[derive(Debug, Clone, Deserialize)]
 pub struct ValueMappingList<FROM, TO>(pub Vec<ValueMapping<FROM, TO>>)
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug;
+    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    TO: std::fmt::Debug;
 
 impl<FROM, TO> ValueMappingList<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    TO: std::fmt::Debug,
 {
     pub fn map_to<'a>(&'a self, value: &'a FROM) -> MappingResult<&'a FROM, &'a TO> {
         self.0
@@ -142,8 +142,8 @@ where
 
 impl<FROM, TO> Default for ValueMappingList<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    TO: std::fmt::Debug,
 {
     fn default() -> Self {
         Self(vec![])
@@ -152,8 +152,8 @@ where
 
 impl<FROM, TO> Deref for ValueMappingList<FROM, TO>
 where
-    FROM: PartialEq + PartialOrd + std::fmt::Debug,
-    TO: PartialEq + PartialOrd + std::fmt::Debug,
+    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    TO: std::fmt::Debug,
 {
     type Target = Vec<ValueMapping<FROM, TO>>;
 
@@ -166,8 +166,8 @@ where
 #[derive(Debug, Clone, Deserialize)]
 pub struct ValueMappingIO<IN, OUT>
 where
-    IN: PartialEq + PartialOrd + std::fmt::Debug,
-    OUT: PartialEq + PartialOrd + std::fmt::Debug,
+    IN: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    OUT: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
 {
     #[serde(default)]
     pub input: ValueMappingList<OUT, IN>,
@@ -178,8 +178,8 @@ where
 #[allow(dead_code)]
 impl<IN, OUT> ValueMappingIO<IN, OUT>
 where
-    IN: PartialEq + PartialOrd + std::fmt::Debug,
-    OUT: PartialEq + PartialOrd + std::fmt::Debug,
+    IN: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
+    OUT: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
 {
     pub fn map_input<'a>(&'a self, value: &'a OUT) -> MappingResult<&'a OUT, &'a IN> {
         self.input.map_to(value)

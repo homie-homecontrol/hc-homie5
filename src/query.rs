@@ -1,4 +1,6 @@
-use crate::value_condition::{ValueCondition, ValueConditionVec};
+use crate::{
+    impl_value_matcher_for, impl_value_matcher_for_vec, value_condition::ValueCondition, AsMatchStr,
+};
 use homie5::{
     device_description::{
         HomieDeviceDescription, HomieNodeDescription, HomiePropertyDescription, HomiePropertyFormat,
@@ -7,6 +9,36 @@ use homie5::{
 };
 use serde::{Deserialize, Deserializer};
 use std::collections::HashSet;
+
+impl AsMatchStr for HomieID {
+    fn as_match_str(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl_value_matcher_for!(HomieID);
+impl_value_matcher_for_vec!(HomieID);
+
+impl AsMatchStr for HomieDataType {
+    fn as_match_str(&self) -> &str {
+        match self {
+            HomieDataType::Integer => "integer",
+            HomieDataType::Float => "float",
+            HomieDataType::Boolean => "boolean",
+            HomieDataType::String => "string",
+            HomieDataType::Enum => "enum",
+            HomieDataType::Color => "color",
+            HomieDataType::Datetime => "datetime",
+            HomieDataType::Duration => "duration",
+            HomieDataType::JSON => "json",
+        }
+    }
+}
+impl_value_matcher_for!(HomieDataType);
+impl_value_matcher_for!(bool, false);
+impl_value_matcher_for!(i64, false);
+impl_value_matcher_for!(HomieDomain, false);
+impl_value_matcher_for_vec!(String);
 
 #[derive(Default, Debug, Clone, Deserialize)]
 pub struct PropertyQuery {
@@ -78,10 +110,10 @@ pub struct DeviceQuery {
     pub name: Option<ValueCondition<String>>,
     pub version: Option<ValueCondition<i64>>,
     pub homie: Option<ValueCondition<String>>,
-    pub children: Option<ValueConditionVec<HomieID>>,
+    pub children: Option<ValueCondition<Vec<HomieID>>>,
     pub root: Option<ValueCondition<HomieID>>,
     pub parent: Option<ValueCondition<HomieID>>,
-    pub extensions: Option<ValueConditionVec<String>>,
+    pub extensions: Option<ValueCondition<Vec<String>>>,
 }
 
 impl DeviceQuery {
