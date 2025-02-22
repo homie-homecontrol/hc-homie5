@@ -223,7 +223,7 @@ checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
 
 [[package]]
 name = "hc-homie5"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "hc-homie5-macros",
  "homie5",
@@ -251,16 +251,16 @@ dependencies = [
 
 [[package]]
 name = "homie5"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d658b1fcff00906ee3c69ec5c688fac0c69a0732945a7a290f58d141194e30d"
+checksum = "bdb64b4d1547511926514edbea3861d884c1e7a5049aed9ce04cd97898bd00b5"
 dependencies = [
  "chrono",
  "log",
  "regex",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
