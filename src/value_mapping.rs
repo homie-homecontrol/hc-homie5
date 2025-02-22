@@ -2,7 +2,112 @@ use crate::{value_condition::ValueCondition, ValueMatcher};
 use serde::Deserialize;
 use std::ops::Deref;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+pub struct ValueMapping<FROM, TO>
+where
+    FROM: ValueMatcher,
+    TO: std::fmt::Debug,
+{
+    #[serde(default = "default_none")]
+    pub from: Option<ValueCondition<FROM>>,
+    pub to: TO,
+}
+
+// Helper function to provide a default value for `Option` fields
+fn default_none<FROM>() -> Option<ValueCondition<FROM>>
+where
+    FROM: ValueMatcher,
+{
+    None
+}
+
+impl<FROM, TO> ValueMapping<FROM, TO>
+where
+    FROM: ValueMatcher,
+    TO: std::fmt::Debug,
+{
+    pub fn map_to<'a>(&'a self, value: &'a FROM) -> MappingResult<&'a FROM, &'a TO> {
+        if self.from.is_none() {
+            return MappingResult::Mapped(&self.to);
+        }
+        if let Some(true) = self.from.as_ref().map(|cond| cond.evaluate(value)) {
+            return MappingResult::Mapped(&self.to);
+        }
+        MappingResult::Unmapped(value)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ValueMappingList<FROM, TO>(pub Vec<ValueMapping<FROM, TO>>)
+where
+    FROM: ValueMatcher,
+    TO: std::fmt::Debug;
+
+impl<FROM, TO> ValueMappingList<FROM, TO>
+where
+    FROM: ValueMatcher,
+    TO: std::fmt::Debug,
+{
+    pub fn map_to<'a>(&'a self, value: &'a FROM) -> MappingResult<&'a FROM, &'a TO> {
+        self.0
+            .iter()
+            .map(|mapping| mapping.map_to(value))
+            .find(|to_value| to_value.is_mapped())
+            .unwrap_or(MappingResult::Unmapped(value))
+    }
+}
+
+impl<FROM, TO> Default for ValueMappingList<FROM, TO>
+where
+    FROM: ValueMatcher,
+    TO: std::fmt::Debug,
+{
+    fn default() -> Self {
+        Self(vec![])
+    }
+}
+
+impl<FROM, TO> Deref for ValueMappingList<FROM, TO>
+where
+    FROM: ValueMatcher,
+    TO: std::fmt::Debug,
+{
+    type Target = Vec<ValueMapping<FROM, TO>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize)]
+pub struct ValueMappingIO<IN, OUT>
+where
+    IN: ValueMatcher,
+    OUT: ValueMatcher,
+{
+    #[serde(default)]
+    pub input: ValueMappingList<OUT, IN>,
+    #[serde(default)]
+    pub output: ValueMappingList<IN, OUT>,
+}
+
+#[allow(dead_code)]
+impl<IN, OUT> ValueMappingIO<IN, OUT>
+where
+    IN: ValueMatcher,
+    OUT: ValueMatcher,
+{
+    pub fn map_input<'a>(&'a self, value: &'a OUT) -> MappingResult<&'a OUT, &'a IN> {
+        self.input.map_to(value)
+    }
+
+    pub fn map_ouput<'a>(&'a self, value: &'a IN) -> MappingResult<&'a IN, &'a OUT> {
+        self.output.map_to(value)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 pub enum MappingResult<FROM, TO>
 where
     FROM: std::fmt::Debug,
@@ -82,110 +187,5 @@ where
             MappingResult::Mapped(v) => v,
             MappingResult::Unmapped(v) => v.into(),
         }
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ValueMapping<FROM, TO>
-where
-    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    TO: std::fmt::Debug,
-{
-    #[serde(default = "default_none")]
-    pub from: Option<ValueCondition<FROM>>,
-    pub to: TO,
-}
-
-// Helper function to provide a default value for `Option` fields
-fn default_none<FROM>() -> Option<ValueCondition<FROM>>
-where
-    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-{
-    None
-}
-
-impl<FROM, TO> ValueMapping<FROM, TO>
-where
-    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    TO: std::fmt::Debug,
-{
-    pub fn map_to<'a>(&'a self, value: &'a FROM) -> MappingResult<&'a FROM, &'a TO> {
-        if self.from.is_none() {
-            return MappingResult::Mapped(&self.to);
-        }
-        if let Some(true) = self.from.as_ref().map(|cond| cond.evaluate(value)) {
-            return MappingResult::Mapped(&self.to);
-        }
-        MappingResult::Unmapped(value)
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ValueMappingList<FROM, TO>(pub Vec<ValueMapping<FROM, TO>>)
-where
-    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    TO: std::fmt::Debug;
-
-impl<FROM, TO> ValueMappingList<FROM, TO>
-where
-    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    TO: std::fmt::Debug,
-{
-    pub fn map_to<'a>(&'a self, value: &'a FROM) -> MappingResult<&'a FROM, &'a TO> {
-        self.0
-            .iter()
-            .map(|mapping| mapping.map_to(value))
-            .find(|to_value| to_value.is_mapped())
-            .unwrap_or(MappingResult::Unmapped(value))
-    }
-}
-
-impl<FROM, TO> Default for ValueMappingList<FROM, TO>
-where
-    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    TO: std::fmt::Debug,
-{
-    fn default() -> Self {
-        Self(vec![])
-    }
-}
-
-impl<FROM, TO> Deref for ValueMappingList<FROM, TO>
-where
-    FROM: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    TO: std::fmt::Debug,
-{
-    type Target = Vec<ValueMapping<FROM, TO>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Deserialize)]
-pub struct ValueMappingIO<IN, OUT>
-where
-    IN: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    OUT: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-{
-    #[serde(default)]
-    pub input: ValueMappingList<OUT, IN>,
-    #[serde(default)]
-    pub output: ValueMappingList<IN, OUT>,
-}
-
-#[allow(dead_code)]
-impl<IN, OUT> ValueMappingIO<IN, OUT>
-where
-    IN: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-    OUT: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
-{
-    pub fn map_input<'a>(&'a self, value: &'a OUT) -> MappingResult<&'a OUT, &'a IN> {
-        self.input.map_to(value)
-    }
-
-    pub fn map_ouput<'a>(&'a self, value: &'a IN) -> MappingResult<&'a IN, &'a OUT> {
-        self.output.map_to(value)
     }
 }
