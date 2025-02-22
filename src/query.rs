@@ -1,4 +1,4 @@
-use crate::value_condition::{ValueCondition, ValueConditionVec};
+use crate::value_condition::ValueCondition;
 use homie5::{
     device_description::{
         HomieDeviceDescription, HomieNodeDescription, HomiePropertyDescription, HomiePropertyFormat,
@@ -78,10 +78,10 @@ pub struct DeviceQuery {
     pub name: Option<ValueCondition<String>>,
     pub version: Option<ValueCondition<i64>>,
     pub homie: Option<ValueCondition<String>>,
-    pub children: Option<ValueConditionVec<HomieID>>,
+    pub children: Option<ValueCondition<Vec<HomieID>>>,
     pub root: Option<ValueCondition<HomieID>>,
     pub parent: Option<ValueCondition<HomieID>>,
-    pub extensions: Option<ValueConditionVec<String>>,
+    pub extensions: Option<ValueCondition<Vec<String>>>,
 }
 
 impl DeviceQuery {
