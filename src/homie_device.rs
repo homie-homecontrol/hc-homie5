@@ -27,10 +27,7 @@ where
     fn publish_property_values(
         &mut self,
     ) -> impl std::future::Future<Output = Result<(), Self::ResultError>> + Send {
-        async {
-            log::debug!("This is the original trait");
-            Ok(())
-        }
+        async { Ok(()) }
     }
 
     fn handle_set_command(
@@ -90,7 +87,7 @@ where
         &mut self,
     ) -> impl std::future::Future<Output = Result<(), Self::ResultError>> + Send {
         async {
-            log::debug!("[{}] publishing", self.homie_proto().id());
+            log::debug!("[{}/{}] publishing", self.homie_domain(), self.homie_id());
 
             let steps = homie_device_publish_steps();
 
@@ -164,36 +161,3 @@ where
         }
     }
 }
-
-// // As all devices look the same we can generate most methods automatically
-// #[macro_export]
-// macro_rules! impl_homie_device_methods {
-//     () => {
-//         fn homie_domain(&self) -> &HomieDomain {
-//             &self.device_ref.homie_domain()
-//         }
-//
-//         fn homie_id(&self) -> &HomieID {
-//             &self.device_ref.device_id()
-//         }
-//         fn description(&self) -> &HomieDeviceDescription {
-//             &self.device_desc
-//         }
-//
-//         fn client(&self) -> &HomieMQTTClient {
-//             &self.homie_client
-//         }
-//
-//         fn homie_proto(&self) -> &Homie5DeviceProtocol {
-//             &self.homie_proto
-//         }
-//
-//         fn state(&self) -> HomieDeviceStatus {
-//             self.status
-//         }
-//
-//         fn set_state(&mut self, state: HomieDeviceStatus) {
-//             self.status = state;
-//         }
-//     };
-// }

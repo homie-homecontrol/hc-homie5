@@ -186,6 +186,7 @@ pub fn run_homie_client(
     ),
     HomieClientError,
 > {
+    log::trace!("Connecting to mqtt: {}", mqttoptions.client_id());
     let (sender, receiver) = mpsc::channel(channel_size);
 
     let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, channel_size);
@@ -197,9 +198,8 @@ pub fn run_homie_client(
             let poll_res = tokio::select! {
                 poll_res = eventloop.poll() => poll_res,
                 _exit = stop_receiver.changed() => {
-                        log::debug!("Before Borrow");
                     if *stop_receiver.borrow() {
-                        log::debug!("Received stop signal. Exiting...");
+                        log::trace!("Received stop signal. Exiting...");
                         break;
                     }
                     continue;
@@ -219,12 +219,12 @@ pub fn run_homie_client(
                         }
                     }
                     rumqttc::Event::Incoming(rumqttc::Incoming::ConnAck(_)) => {
-                        log::debug!("HOMIE: Connected");
+                        log::trace!("HOMIE: Connected");
                         connected = true;
                         sender.send(HomieClientEvent::Connect).await?;
                     }
                     rumqttc::Event::Outgoing(rumqttc::Outgoing::Disconnect) => {
-                        log::debug!("HOMIE: Connection closed from our side.",);
+                        log::trace!("HOMIE: Connection closed from our side.",);
                         sender.send(HomieClientEvent::Disconnect).await?;
 
                         break;
@@ -237,14 +237,15 @@ pub fn run_homie_client(
                         connected = false;
                         sender.send(HomieClientEvent::Disconnect).await?;
                     }
-                    log::error!("Error connecting mqtt. {:#?}", err);
+
+                    log::error!("HomieClient: Error connecting mqtt. {:#?}", err);
                     sender.send(HomieClientEvent::Error(err)).await?;
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             };
         }
         sender.send(HomieClientEvent::Stop).await?;
-        log::debug!("Exiting homie client eventloop...");
+        log::trace!("Exiting homie client eventloop...");
         Ok(())
     });
     Ok((
