@@ -21,15 +21,16 @@ pub struct PropertyQuery {
 
 impl PropertyQuery {
     pub fn match_query(&self, id: &HomieID, property_desc: &HomiePropertyDescription) -> bool {
-        self.id.as_ref().map_or(true, |cond| cond.evaluate(id))
-            && self.name.as_ref().map_or(true, |cond| {
-                cond.evaluate_option(property_desc.name.as_ref())
-            })
+        self.id.as_ref().is_none_or(|cond| cond.evaluate(id))
+            && self
+                .name
+                .as_ref()
+                .is_none_or(|cond| cond.evaluate_option(property_desc.name.as_ref()))
             && self
                 .datatype
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate(&property_desc.datatype))
-            && self.format.as_ref().map_or(true, |cond| {
+                .is_none_or(|cond| cond.evaluate(&property_desc.datatype))
+            && self.format.as_ref().is_none_or(|cond| {
                 // Treat `Empty` as no value
                 if let HomiePropertyFormat::Empty = property_desc.format {
                     false
@@ -40,14 +41,15 @@ impl PropertyQuery {
             && self
                 .settable
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate(&property_desc.settable))
+                .is_none_or(|cond| cond.evaluate(&property_desc.settable))
             && self
                 .retained
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate(&property_desc.retained))
-            && self.unit.as_ref().map_or(true, |cond| {
-                cond.evaluate_option(property_desc.unit.as_ref())
-            })
+                .is_none_or(|cond| cond.evaluate(&property_desc.retained))
+            && self
+                .unit
+                .as_ref()
+                .is_none_or(|cond| cond.evaluate_option(property_desc.unit.as_ref()))
     }
 }
 
@@ -60,15 +62,15 @@ pub struct NodeQuery {
 
 impl NodeQuery {
     pub fn match_query(&self, id: &HomieID, node_desc: &HomieNodeDescription) -> bool {
-        self.id.as_ref().map_or(true, |cond| cond.evaluate(id))
+        self.id.as_ref().is_none_or(|cond| cond.evaluate(id))
             && self
                 .name
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate_option(node_desc.name.as_ref()))
+                .is_none_or(|cond| cond.evaluate_option(node_desc.name.as_ref()))
             && self
                 .r#type
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate_option(node_desc.r#type.as_ref()))
+                .is_none_or(|cond| cond.evaluate_option(node_desc.r#type.as_ref()))
     }
 }
 
@@ -87,34 +89,35 @@ pub struct DeviceQuery {
 impl DeviceQuery {
     pub fn match_query(&self, id: &HomieID, device_desc: &HomieDeviceDescription) -> bool {
         // Check each condition in sequence and short-circuit if any condition evaluates to `false`
-        self.id.as_ref().map_or(true, |cond| cond.evaluate(id))
+        self.id.as_ref().is_none_or(|cond| cond.evaluate(id))
             && self
                 .name
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate_option(device_desc.name.as_ref()))
+                .is_none_or(|cond| cond.evaluate_option(device_desc.name.as_ref()))
             && self
                 .root
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate_option(device_desc.root.as_ref()))
+                .is_none_or(|cond| cond.evaluate_option(device_desc.root.as_ref()))
             && self
                 .homie
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate(&device_desc.homie))
-            && self.parent.as_ref().map_or(true, |cond| {
-                cond.evaluate_option(device_desc.parent.as_ref())
-            })
+                .is_none_or(|cond| cond.evaluate(&device_desc.homie))
+            && self
+                .parent
+                .as_ref()
+                .is_none_or(|cond| cond.evaluate_option(device_desc.parent.as_ref()))
             && self
                 .version
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate(&device_desc.version))
+                .is_none_or(|cond| cond.evaluate(&device_desc.version))
             && self
                 .children
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate(&device_desc.children))
+                .is_none_or(|cond| cond.evaluate(&device_desc.children))
             && self
                 .extensions
                 .as_ref()
-                .map_or(true, |cond| cond.evaluate(&device_desc.extensions))
+                .is_none_or(|cond| cond.evaluate(&device_desc.extensions))
     }
 }
 
@@ -140,25 +143,29 @@ impl QueryDefinition {
         let mut matched_properties = Vec::new();
 
         // Check if the device matches the domain and device-level queries
-        if self.domain.as_ref().map_or(true, |cond| {
+        if self.domain.as_ref().is_none_or(|cond| {
             if let Some(v) = cond.value() {
                 if matches!(v, HomieDomain::All) {
                     return true;
                 }
             }
             cond.evaluate(domain)
-        }) && self.device.as_ref().map_or(true, |device_query| {
-            device_query.match_query(id, device_desc)
-        }) {
+        }) && self
+            .device
+            .as_ref()
+            .is_none_or(|device_query| device_query.match_query(id, device_desc))
+        {
             // Iterate through all nodes and their properties
             for (node_id, node_desc) in &device_desc.nodes {
                 // Check if the node matches the node-level query
-                if self.node.as_ref().map_or(true, |node_query| {
-                    node_query.match_query(node_id, node_desc)
-                }) {
+                if self
+                    .node
+                    .as_ref()
+                    .is_none_or(|node_query| node_query.match_query(node_id, node_desc))
+                {
                     for (prop_id, prop_desc) in &node_desc.properties {
                         // Check if the property matches the property-level query
-                        if self.property.as_ref().map_or(true, |property_query| {
+                        if self.property.as_ref().is_none_or(|property_query| {
                             property_query.match_query(prop_id, prop_desc)
                         }) {
                             // Create a PropertyRef for the matched property
