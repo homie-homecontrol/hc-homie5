@@ -21,6 +21,8 @@ pub enum DeviceUpdate<'a> {
     NoChange,
 }
 
+#[allow(clippy::large_enum_variant)] // Suppress the Clippy warning for large enum variants - most
+                                     // messages will be Update
 pub enum DescriptionUpdate<'a> {
     Update {
         device: &'a DeviceRef,
@@ -30,6 +32,9 @@ pub enum DescriptionUpdate<'a> {
     NoChange,
     NotFound,
 }
+
+#[allow(clippy::large_enum_variant)] // Suppress the Clippy warning for large enum variants - most
+                                     // messages will be Remove
 pub enum DeviceRemove {
     Removed(Device),
     NotFound,
@@ -149,7 +154,7 @@ impl DeviceStore {
         }
     }
 
-    pub fn device_entry(&mut self, devref: DeviceRef) -> Entry<HomieID, Device> {
+    pub fn device_entry(&mut self, devref: DeviceRef) -> Entry<'_, HomieID, Device> {
         let (homie_domain, id) = devref.into_parts();
         self.0.entry(homie_domain).or_default().entry(id)
     }
@@ -232,7 +237,7 @@ impl DeviceStore {
         Some(root_device_state)
     }
 
-    pub fn topics(&self) -> Keys<HomieDomain, DeviceMap> {
+    pub fn topics(&self) -> Keys<'_, HomieDomain, DeviceMap> {
         self.0.keys()
     }
 
@@ -249,7 +254,7 @@ impl DeviceStore {
         self.0.values().map(|v| v.keys().count()).sum()
     }
 
-    pub fn iter(&self) -> DeviceStoreIterator {
+    pub fn iter(&self) -> DeviceStoreIterator<'_> {
         DeviceStoreIterator::new(self)
     }
 
