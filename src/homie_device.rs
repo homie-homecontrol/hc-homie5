@@ -17,6 +17,7 @@ pub trait HomieDeviceCore {
     fn set_state(&mut self, state: HomieDeviceStatus);
 }
 
+#[cfg_attr(feature = "enum-dispatch", enum_dispatch::enum_dispatch)]
 pub trait HomieDevice: HomieDeviceCore
 where
     Self: Send + Sync,
