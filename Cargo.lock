@@ -183,18 +183,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
-name = "enum_dispatch"
-version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
-dependencies = [
- "once_cell",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -300,7 +288,6 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 name = "hc-homie5"
 version = "0.4.2"
 dependencies = [
- "enum_dispatch",
  "hc-homie5-macros",
  "homie5",
  "log",
@@ -318,8 +305,6 @@ dependencies = [
 [[package]]
 name = "hc-homie5-macros"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1af114f76c41d360f8a4ea27806078ee3f84ff37f35c59eb10ddb52efcfa84f"
 dependencies = [
  "proc-macro2",
  "quote",
