@@ -20,8 +20,13 @@ pub enum HomieClientError {
     MqttClient(#[from] ClientError),
     #[error("Error waiting for homie client task to complete: {0} -- {0:#?}")]
     JoinError(#[from] JoinError),
-    #[error("Error sending event to mpsc channel: {0} -- {0:#?}")]
-    ChannelSendError(#[from] SendError<HomieClientEvent>),
+    #[error("Hhomie client channel is closed. Error sending event via mpsc::channel.")]
+    ChannelClosed,
+}
+impl From<SendError<HomieClientEvent>> for HomieClientError {
+    fn from(_: SendError<HomieClientEvent>) -> Self {
+        Self::ChannelClosed
+    }
 }
 
 #[derive(Debug, Clone)]

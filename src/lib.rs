@@ -42,3 +42,4 @@ pub use value_mapping::*;
 
 #[cfg(feature = "macros")]
 pub use hc_homie5_macros::homie_device;
+pub use hc_homie5_macros::homie_device_enum;
