@@ -286,7 +286,7 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 
 [[package]]
 name = "hc-homie5"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "hc-homie5-macros",
  "homie5",
@@ -304,7 +304,9 @@ dependencies = [
 
 [[package]]
 name = "hc-homie5-macros"
-version = "0.1.1"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61f5b14e9fa498c6f5797dc7ba47c50192ae45ff6ff3aa969aae67c4a9afc86b"
 dependencies = [
  "proc-macro2",
  "quote",
