@@ -1,4 +1,5 @@
 use homie5::{HomieValue, PropertyPointer};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
@@ -9,7 +10,7 @@ pub enum ValueUpdate<T> {
     Changed { old: Option<T>, new: T },
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct PropertyValueEntry {
     pub value: Option<HomieValue>,
     pub target: Option<HomieValue>,

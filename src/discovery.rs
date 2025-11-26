@@ -1,6 +1,6 @@
 use homie5::{
-    DeviceRef, Homie5ControllerProtocol, Homie5Message, HomieDeviceStatus, HomieDomain, HomieID,
-    HomieValue, PropertyRef, ToTopic,
+    extensions::MetaControllerProtocol, DeviceRef, Homie5ControllerProtocol, Homie5Message,
+    HomieDeviceStatus, HomieDomain, HomieID, HomieValue, PropertyRef, ToTopic,
 };
 use rumqttc::ClientError;
 use thiserror::Error;
@@ -53,6 +53,7 @@ pub enum DiscoveryAction {
         device: DeviceRef,
         alert_id: HomieID,
     },
+
     Unhandled(Homie5Message),
 }
 
@@ -66,6 +67,7 @@ pub enum DiscoveryError {
 #[derive(Clone)]
 pub struct HomieDiscovery {
     client: Homie5ControllerProtocol,
+    meta_client: MetaControllerProtocol,
     mqtt_client: HomieMQTTClient,
 }
 
@@ -74,6 +76,7 @@ impl HomieDiscovery {
         Self {
             mqtt_client,
             client: Homie5ControllerProtocol::new(),
+            meta_client: MetaControllerProtocol::new(),
         }
     }
 
@@ -108,6 +111,9 @@ impl HomieDiscovery {
                     self.mqtt_client
                         .homie_subscribe(self.client.subscribe_device(device_ref))
                         .await?;
+                    self.mqtt_client
+                        .homie_subscribe(self.meta_client.subscribe_for_device(device_ref))
+                        .await?;
                     Some(DiscoveryAction::NewDevice {
                         device,
                         status: state,
@@ -134,10 +140,19 @@ impl HomieDiscovery {
                         self.mqtt_client
                             .homie_unsubscribe(self.client.unsubscribe_props(device_ref, &from))
                             .await?;
+                        self.mqtt_client
+                            .homie_unsubscribe(
+                                self.meta_client
+                                    .unsubscribe_for_nodes_props(device_ref, &from),
+                            )
+                            .await?;
                     }
 
                     self.mqtt_client
                         .homie_subscribe(self.client.subscribe_props(device_ref, to))
+                        .await?;
+                    self.mqtt_client
+                        .homie_subscribe(self.meta_client.subscribe_for_nodes_props(device_ref, to))
                         .await?;
                     Some(DiscoveryAction::DeviceDescriptionChanged(device))
                 }
@@ -165,6 +180,9 @@ impl HomieDiscovery {
                 self.mqtt_client
                     .homie_unsubscribe(self.client.unsubscribe_device(&device))
                     .await?;
+                self.mqtt_client
+                    .homie_unsubscribe(self.meta_client.unsubscribe_for_device(&device))
+                    .await?;
 
                 let DeviceRemove::Removed(dev) = devices.remove_device(&device) else {
                     return Ok(None);
@@ -176,6 +194,12 @@ impl HomieDiscovery {
 
                 self.mqtt_client
                     .homie_unsubscribe(self.client.unsubscribe_props(&device, description))
+                    .await?;
+                self.mqtt_client
+                    .homie_unsubscribe(
+                        self.meta_client
+                            .unsubscribe_for_nodes_props(&device, description),
+                    )
                     .await?;
 
                 log::info!("============> Removed device {}", dev.device_id());
