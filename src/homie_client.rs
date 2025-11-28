@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use homie5::{client::LastWill, parse_mqtt_message, Homie5Message};
+use homie5::{client::LastWill, extensions::MetaExtMessage, parse_mqtt_message, Homie5Message};
 use rand::{distr::Alphanumeric, rng, Rng};
 use rumqttc::{AsyncClient, ClientError, ConnectionError, MqttOptions};
 use thiserror::Error;
@@ -218,8 +218,25 @@ pub fn run_homie_client(
                             Ok(event) => {
                                 sender.send(HomieClientEvent::HomieMessage(event)).await?;
                             }
-                            Err(err) => {
-                                log::error!("Error parsing message! Topic: [{}], Payload: [{:?}], Error: {}", p.topic, p.payload, err)
+                            Err(homie_err) => {
+                                match MetaExtMessage::from_mqtt_message(&p.topic, &p.payload) {
+                                    Ok(meta_event) => {
+                                        log::debug!(
+                                            "MetaExtMessage (not handled yet): {:#?}",
+                                            meta_event
+                                        );
+                                    }
+                                    Err(meta_err) => {
+                                        log::error!(
+                                            "Error parsing MQTT message.\n  Topic: [{}]\n  Payload: [{:?}]\n  Homie parse error: {}\n  MetaExt parse error: {}",
+                                            p.topic,
+                                            p.payload,
+                                            homie_err,
+                                            meta_err
+                                        );
+                                    }
+                                }
+                                // log::error!("Error parsing message! Topic: [{}], Payload: [{:?}], Error: {}", p.topic, p.payload, err)
                             }
                         }
                     }
