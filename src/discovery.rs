@@ -1,61 +1,14 @@
 use homie5::{
     extensions::MetaControllerProtocol, DeviceRef, Homie5ControllerProtocol, Homie5Message,
-    HomieDeviceStatus, HomieDomain, HomieID, HomieValue, PropertyRef, ToTopic,
+    HomieDomain, HomieID, HomieValue, PropertyRef, ToTopic,
 };
 use rumqttc::ClientError;
 use thiserror::Error;
 
 use crate::{
-    device_store::{Device, DeviceStore},
-    property_value_store::ValueUpdate,
-    AlertUpdate, DescriptionUpdate, DeviceRemove, DeviceUpdate, HomieMQTTClient,
+    device_store::DeviceStore, AlertUpdate, DescriptionUpdate, DeviceRemove, DeviceUpdate,
+    DiscoveryAction, HomieMQTTClient, ValueUpdate,
 };
-
-#[derive(Debug, Clone)]
-pub enum DiscoveryAction {
-    NewDevice {
-        device: DeviceRef,
-        status: HomieDeviceStatus,
-    },
-    DeviceRemoved(Device),
-    StateChanged {
-        device: DeviceRef,
-        from: HomieDeviceStatus,
-        to: HomieDeviceStatus,
-    },
-    DeviceDescriptionChanged(DeviceRef),
-    DevicePropertyValueChanged {
-        prop: PropertyRef,
-        from: Option<HomieValue>,
-        to: HomieValue,
-    },
-    DevicePropertyTargetChanged {
-        prop: PropertyRef,
-        from: Option<HomieValue>,
-        to: HomieValue,
-    },
-    DevicePropertyValueTriggered {
-        prop: PropertyRef,
-        value: HomieValue,
-    },
-    DeviceAlert {
-        device: DeviceRef,
-        alert_id: HomieID,
-        alert: String,
-    },
-    DeviceAlertChanged {
-        device: DeviceRef,
-        alert_id: HomieID,
-        from_alert: String,
-        to_alert: String,
-    },
-    DeviceAlertCleared {
-        device: DeviceRef,
-        alert_id: HomieID,
-    },
-
-    Unhandled(Homie5Message),
-}
 
 #[derive(Debug, Error)]
 pub enum DiscoveryError {

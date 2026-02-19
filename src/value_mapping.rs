@@ -1,8 +1,8 @@
 use crate::{value_condition::ValueCondition, ValueMatcher};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ValueMapping<FROM, TO>
 where
     FROM: ValueMatcher,
@@ -37,7 +37,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ValueMappingList<FROM, TO>(pub Vec<ValueMapping<FROM, TO>>)
 where
     FROM: ValueMatcher,
@@ -80,7 +80,7 @@ where
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ValueMappingIO<IN, OUT>
 where
     IN: ValueMatcher,
