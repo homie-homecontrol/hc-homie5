@@ -2,8 +2,16 @@ use chrono::{DateTime, Utc};
 use homie5::HomieValue;
 use serde::{Deserialize, Serialize};
 pub enum ValueUpdate<T> {
-    Equal,
-    Changed { old: Option<T>, new: T },
+    Equal {
+        last_received: Option<DateTime<Utc>>,
+        last_changed: Option<DateTime<Utc>>,
+    },
+    Changed {
+        old: Option<T>,
+        new: T,
+        last_received: Option<DateTime<Utc>>,
+        last_changed: Option<DateTime<Utc>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

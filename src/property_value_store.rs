@@ -42,9 +42,17 @@ impl PropertyValueStore {
                 let old = entry.value.clone();
                 entry.value = Some(value.clone());
                 entry.value_last_changed = Some(now);
-                ValueUpdate::Changed { old, new: value }
+                ValueUpdate::Changed {
+                    old,
+                    new: value,
+                    last_received: Some(now),
+                    last_changed: Some(now),
+                }
             } else {
-                ValueUpdate::Equal
+                ValueUpdate::Equal {
+                    last_received: Some(now),
+                    last_changed: entry.value_last_changed,
+                }
             }
         } else {
             self.0.insert(
@@ -59,6 +67,8 @@ impl PropertyValueStore {
             ValueUpdate::Changed {
                 old: None,
                 new: value,
+                last_received: Some(now),
+                last_changed: Some(now),
             }
         }
     }
@@ -75,9 +85,17 @@ impl PropertyValueStore {
                 let old = entry.target.clone();
                 entry.target = Some(target.clone());
                 entry.target_last_changed = Some(now);
-                ValueUpdate::Changed { old, new: target }
+                ValueUpdate::Changed {
+                    old,
+                    new: target,
+                    last_received: Some(now),
+                    last_changed: Some(now),
+                }
             } else {
-                ValueUpdate::Equal
+                ValueUpdate::Equal {
+                    last_received: Some(now),
+                    last_changed: entry.target_last_changed,
+                }
             }
         } else {
             self.0.insert(
@@ -92,6 +110,8 @@ impl PropertyValueStore {
             ValueUpdate::Changed {
                 old: None,
                 new: target,
+                last_received: Some(now),
+                last_changed: Some(now),
             }
         }
     }

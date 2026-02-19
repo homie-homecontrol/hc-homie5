@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use homie5::{DeviceRef, Homie5Message, HomieDeviceStatus, HomieID, HomieValue, PropertyRef};
 
 use crate::Device;
@@ -19,11 +20,15 @@ pub enum DiscoveryAction {
         prop: PropertyRef,
         from: Option<HomieValue>,
         to: HomieValue,
+        value_last_received: Option<DateTime<Utc>>,
+        value_last_changed: Option<DateTime<Utc>>,
     },
     DevicePropertyTargetChanged {
         prop: PropertyRef,
         from: Option<HomieValue>,
         to: HomieValue,
+        target_last_received: Option<DateTime<Utc>>,
+        target_last_changed: Option<DateTime<Utc>>,
     },
     DevicePropertyValueTriggered {
         prop: PropertyRef,

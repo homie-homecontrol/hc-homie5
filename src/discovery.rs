@@ -190,14 +190,19 @@ impl HomieDiscovery {
                 .prop_values
                 .store_value(property.prop_pointer(), value)
             {
-                ValueUpdate::Equal => None,
-                ValueUpdate::Changed { old, new } => {
-                    Some(DiscoveryAction::DevicePropertyValueChanged {
-                        prop: property,
-                        from: old,
-                        to: new,
-                    })
-                }
+                ValueUpdate::Equal { .. } => None,
+                ValueUpdate::Changed {
+                    old,
+                    new,
+                    last_received,
+                    last_changed,
+                } => Some(DiscoveryAction::DevicePropertyValueChanged {
+                    prop: property,
+                    from: old,
+                    to: new,
+                    value_last_received: last_received,
+                    value_last_changed: last_changed,
+                }),
             }
         } else {
             Some(DiscoveryAction::DevicePropertyValueTriggered {
@@ -224,14 +229,19 @@ impl HomieDiscovery {
             .prop_values
             .store_target(property.prop_pointer(), value)
         {
-            ValueUpdate::Equal => None,
-            ValueUpdate::Changed { old, new } => {
-                Some(DiscoveryAction::DevicePropertyTargetChanged {
-                    prop: property,
-                    from: old,
-                    to: new,
-                })
-            }
+            ValueUpdate::Equal { .. } => None,
+            ValueUpdate::Changed {
+                old,
+                new,
+                last_received,
+                last_changed,
+            } => Some(DiscoveryAction::DevicePropertyTargetChanged {
+                prop: property,
+                from: old,
+                to: new,
+                target_last_received: last_received,
+                target_last_changed: last_changed,
+            }),
         }
     }
     #[allow(dead_code)]
