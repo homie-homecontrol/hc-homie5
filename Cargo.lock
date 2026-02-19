@@ -288,6 +288,7 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 name = "hc-homie5"
 version = "0.4.3"
 dependencies = [
+ "chrono",
  "hc-homie5-macros",
  "homie5",
  "log",

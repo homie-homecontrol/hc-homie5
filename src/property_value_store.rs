@@ -1,3 +1,4 @@
+use chrono::Utc;
 use homie5::{HomieValue, PropertyPointer};
 use std::{
     collections::HashMap,
@@ -34,10 +35,13 @@ impl PropertyValueStore {
         prop: &PropertyPointer,
         value: HomieValue,
     ) -> ValueUpdate<HomieValue> {
+        let now = Utc::now();
         if let Some(entry) = self.0.get_mut(prop) {
+            entry.value_last_received = Some(now);
             if entry.value.as_ref() != Some(&value) {
                 let old = entry.value.clone();
                 entry.value = Some(value.clone());
+                entry.value_last_changed = Some(now);
                 ValueUpdate::Changed { old, new: value }
             } else {
                 ValueUpdate::Equal
@@ -47,6 +51,8 @@ impl PropertyValueStore {
                 prop.clone(),
                 PropertyValueEntry {
                     value: Some(value.clone()),
+                    value_last_received: Some(now),
+                    value_last_changed: Some(now),
                     ..Default::default()
                 },
             );
@@ -62,10 +68,13 @@ impl PropertyValueStore {
         prop: &PropertyPointer,
         target: HomieValue,
     ) -> ValueUpdate<HomieValue> {
+        let now = Utc::now();
         if let Some(entry) = self.0.get_mut(prop) {
+            entry.target_last_received = Some(now);
             if entry.target.as_ref() != Some(&target) {
                 let old = entry.target.clone();
                 entry.target = Some(target.clone());
+                entry.target_last_changed = Some(now);
                 ValueUpdate::Changed { old, new: target }
             } else {
                 ValueUpdate::Equal
@@ -75,6 +84,8 @@ impl PropertyValueStore {
                 prop.clone(),
                 PropertyValueEntry {
                     target: Some(target.clone()),
+                    target_last_received: Some(now),
+                    target_last_changed: Some(now),
                     ..Default::default()
                 },
             );
