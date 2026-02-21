@@ -1,60 +1,14 @@
 use homie5::{
-    DeviceRef, Homie5ControllerProtocol, Homie5Message, HomieDeviceStatus, HomieDomain, HomieID,
-    HomieValue, PropertyRef, ToTopic,
+    extensions::MetaControllerProtocol, DeviceRef, Homie5ControllerProtocol, Homie5Message,
+    HomieDomain, HomieID, HomieValue, PropertyRef, ToTopic,
 };
 use rumqttc::ClientError;
 use thiserror::Error;
 
 use crate::{
-    device_store::{Device, DeviceStore},
-    property_value_store::ValueUpdate,
-    AlertUpdate, DescriptionUpdate, DeviceRemove, DeviceUpdate, HomieMQTTClient,
+    device_store::DeviceStore, AlertUpdate, DescriptionUpdate, DeviceRemove, DeviceUpdate,
+    DiscoveryAction, HomieMQTTClient, ValueUpdate,
 };
-
-#[derive(Debug, Clone)]
-pub enum DiscoveryAction {
-    NewDevice {
-        device: DeviceRef,
-        status: HomieDeviceStatus,
-    },
-    DeviceRemoved(Device),
-    StateChanged {
-        device: DeviceRef,
-        from: HomieDeviceStatus,
-        to: HomieDeviceStatus,
-    },
-    DeviceDescriptionChanged(DeviceRef),
-    DevicePropertyValueChanged {
-        prop: PropertyRef,
-        from: Option<HomieValue>,
-        to: HomieValue,
-    },
-    DevicePropertyTargetChanged {
-        prop: PropertyRef,
-        from: Option<HomieValue>,
-        to: HomieValue,
-    },
-    DevicePropertyValueTriggered {
-        prop: PropertyRef,
-        value: HomieValue,
-    },
-    DeviceAlert {
-        device: DeviceRef,
-        alert_id: HomieID,
-        alert: String,
-    },
-    DeviceAlertChanged {
-        device: DeviceRef,
-        alert_id: HomieID,
-        from_alert: String,
-        to_alert: String,
-    },
-    DeviceAlertCleared {
-        device: DeviceRef,
-        alert_id: HomieID,
-    },
-    Unhandled(Homie5Message),
-}
 
 #[derive(Debug, Error)]
 pub enum DiscoveryError {
@@ -66,6 +20,7 @@ pub enum DiscoveryError {
 #[derive(Clone)]
 pub struct HomieDiscovery {
     client: Homie5ControllerProtocol,
+    meta_client: MetaControllerProtocol,
     mqtt_client: HomieMQTTClient,
 }
 
@@ -74,6 +29,7 @@ impl HomieDiscovery {
         Self {
             mqtt_client,
             client: Homie5ControllerProtocol::new(),
+            meta_client: MetaControllerProtocol::new(),
         }
     }
 
@@ -108,6 +64,9 @@ impl HomieDiscovery {
                     self.mqtt_client
                         .homie_subscribe(self.client.subscribe_device(device_ref))
                         .await?;
+                    self.mqtt_client
+                        .homie_subscribe(self.meta_client.subscribe_for_device(device_ref))
+                        .await?;
                     Some(DiscoveryAction::NewDevice {
                         device,
                         status: state,
@@ -134,10 +93,19 @@ impl HomieDiscovery {
                         self.mqtt_client
                             .homie_unsubscribe(self.client.unsubscribe_props(device_ref, &from))
                             .await?;
+                        self.mqtt_client
+                            .homie_unsubscribe(
+                                self.meta_client
+                                    .unsubscribe_for_nodes_props(device_ref, &from),
+                            )
+                            .await?;
                     }
 
                     self.mqtt_client
                         .homie_subscribe(self.client.subscribe_props(device_ref, to))
+                        .await?;
+                    self.mqtt_client
+                        .homie_subscribe(self.meta_client.subscribe_for_nodes_props(device_ref, to))
                         .await?;
                     Some(DiscoveryAction::DeviceDescriptionChanged(device))
                 }
@@ -165,6 +133,9 @@ impl HomieDiscovery {
                 self.mqtt_client
                     .homie_unsubscribe(self.client.unsubscribe_device(&device))
                     .await?;
+                self.mqtt_client
+                    .homie_unsubscribe(self.meta_client.unsubscribe_for_device(&device))
+                    .await?;
 
                 let DeviceRemove::Removed(dev) = devices.remove_device(&device) else {
                     return Ok(None);
@@ -176,6 +147,12 @@ impl HomieDiscovery {
 
                 self.mqtt_client
                     .homie_unsubscribe(self.client.unsubscribe_props(&device, description))
+                    .await?;
+                self.mqtt_client
+                    .homie_unsubscribe(
+                        self.meta_client
+                            .unsubscribe_for_nodes_props(&device, description),
+                    )
                     .await?;
 
                 log::info!("============> Removed device {}", dev.device_id());
@@ -213,14 +190,19 @@ impl HomieDiscovery {
                 .prop_values
                 .store_value(property.prop_pointer(), value)
             {
-                ValueUpdate::Equal => None,
-                ValueUpdate::Changed { old, new } => {
-                    Some(DiscoveryAction::DevicePropertyValueChanged {
-                        prop: property,
-                        from: old,
-                        to: new,
-                    })
-                }
+                ValueUpdate::Equal { .. } => None,
+                ValueUpdate::Changed {
+                    old,
+                    new,
+                    last_received,
+                    last_changed,
+                } => Some(DiscoveryAction::DevicePropertyValueChanged {
+                    prop: property,
+                    from: old,
+                    to: new,
+                    value_last_received: last_received,
+                    value_last_changed: last_changed,
+                }),
             }
         } else {
             Some(DiscoveryAction::DevicePropertyValueTriggered {
@@ -247,14 +229,19 @@ impl HomieDiscovery {
             .prop_values
             .store_target(property.prop_pointer(), value)
         {
-            ValueUpdate::Equal => None,
-            ValueUpdate::Changed { old, new } => {
-                Some(DiscoveryAction::DevicePropertyTargetChanged {
-                    prop: property,
-                    from: old,
-                    to: new,
-                })
-            }
+            ValueUpdate::Equal { .. } => None,
+            ValueUpdate::Changed {
+                old,
+                new,
+                last_received,
+                last_changed,
+            } => Some(DiscoveryAction::DevicePropertyTargetChanged {
+                prop: property,
+                from: old,
+                to: new,
+                target_last_received: last_received,
+                target_last_changed: last_changed,
+            }),
         }
     }
     #[allow(dead_code)]

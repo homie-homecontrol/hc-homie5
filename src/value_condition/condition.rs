@@ -1,4 +1,4 @@
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 
 use super::ValueMatcher;
@@ -92,7 +92,7 @@ where
     }
 }
 // --- Condition Operators, extended with pattern matching variants ---
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConditionOperator {
     Equal,
     Greater,
@@ -127,6 +127,24 @@ impl FromStr for ConditionOperator {
         }
     }
 }
+impl std::fmt::Display for ConditionOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ConditionOperator::Equal => "=",
+            ConditionOperator::Greater => ">",
+            ConditionOperator::Less => "<",
+            ConditionOperator::GreaterOrEqual => ">=",
+            ConditionOperator::LessOrEqual => "<=",
+            ConditionOperator::NotEqual => "<>",
+            ConditionOperator::IncludesAny => "includesAny",
+            ConditionOperator::IncludesNone => "includesNone",
+            ConditionOperator::MatchAlways => "matchAlways",
+            ConditionOperator::IsEmpty => "isEmpty",
+            ConditionOperator::Exists => "exists",
+        };
+        f.write_str(s)
+    }
+}
 
 impl<'de> Deserialize<'de> for ConditionOperator {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -136,6 +154,15 @@ impl<'de> Deserialize<'de> for ConditionOperator {
         let s: &str = Deserialize::deserialize(deserializer)?;
         ConditionOperator::from_str(s)
             .map_err(|_| de::Error::custom(format!("Invalid ConditionOperator: {}", s)))
+    }
+}
+
+impl Serialize for ConditionOperator {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 
