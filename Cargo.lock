@@ -335,7 +335,7 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 
 [[package]]
 name = "hc-homie5"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "hc-homie5-macros",
@@ -371,9 +371,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "homie5"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17b4bcaa54468b39375a1d2ecc926d88ca11ed67d277f7f185c972009eae43ef"
+checksum = "f5e5599b7f313f253a4b9fa9b224e45e440849c3a02a8372f9917a2c7bbf1489"
 dependencies = [
  "chrono",
  "log",

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use homie5::{client::LastWill, extensions::MetaExtMessage, parse_mqtt_message, Homie5Message};
-use rand::{distr::Alphanumeric, rng, Rng};
+use rand::{distr::Alphanumeric, rng, RngExt};
 use rumqttc::{AsyncClient, ClientError, ConnectionError, MqttOptions};
 use thiserror::Error;
 use tokio::{
