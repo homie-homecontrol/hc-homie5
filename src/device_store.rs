@@ -50,6 +50,8 @@ impl DeviceStore {
                 description: None,
                 prop_values: PropertyValueStore::new(),
                 alerts: AlertStore::new(),
+                #[cfg(feature = "ext-meta")]
+                meta_overlays: std::collections::HashMap::new(),
             };
             if let Some(dev_map) = self.0.get_mut(device_ref.homie_domain()) {
                 dev_map.insert(device_ref.device_id().to_owned(), device);

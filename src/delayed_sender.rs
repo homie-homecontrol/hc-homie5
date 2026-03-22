@@ -47,6 +47,9 @@ impl DelayedSender {
     }
 
     pub fn is_finished(&self) -> bool {
-        self.handle.as_ref().map(|h| h.is_finished()).unwrap_or(true)
+        self.handle
+            .as_ref()
+            .map(|h| h.is_finished())
+            .unwrap_or(true)
     }
 }

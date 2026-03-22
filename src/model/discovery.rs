@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 use homie5::{DeviceRef, Homie5Message, HomieDeviceStatus, HomieID, HomieValue, PropertyRef};
+#[cfg(feature = "ext-meta")]
+use homie5::HomieDomain;
 
 use crate::Device;
 
@@ -49,6 +51,27 @@ pub enum DiscoveryAction {
         device: DeviceRef,
         alert_id: HomieID,
     },
-
+    #[cfg(feature = "ext-meta")]
+    MetaProviderDiscovered {
+        homie_domain: HomieDomain,
+        provider_id: HomieID,
+        info: homie5::extensions::meta::MetaProviderInfo,
+    },
+    #[cfg(feature = "ext-meta")]
+    MetaProviderRemoved {
+        homie_domain: HomieDomain,
+        provider_id: HomieID,
+    },
+    #[cfg(feature = "ext-meta")]
+    MetaDeviceOverlayChanged {
+        provider_id: HomieID,
+        device_id: HomieID,
+        overlay: homie5::extensions::meta::MetaDeviceOverlay,
+    },
+    #[cfg(feature = "ext-meta")]
+    MetaDeviceOverlayRemoved {
+        provider_id: HomieID,
+        device_id: HomieID,
+    },
     Unhandled(Homie5Message),
 }
