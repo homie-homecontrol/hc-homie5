@@ -1,10 +1,12 @@
+use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 
 use super::ValueMatcher;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(untagged, deny_unknown_fields)]
+#[schemars(bound = "T: JsonSchema")]
 pub enum ValueCondition<T>
 where
     T: ValueMatcher + PartialEq + PartialOrd + std::fmt::Debug,
@@ -14,7 +16,7 @@ where
     Pattern(Pattern),
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct Pattern {
     pub pattern: String,
 }
@@ -52,22 +54,15 @@ where
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(bound = "T: JsonSchema")]
 pub struct ValueOperatorCondition<T>
 where
     T: ValueMatcher + std::fmt::Debug,
 {
     pub operator: ConditionOperator,
-    #[serde(default = "default_value")]
     pub value: Option<ValueSet<T>>,
-}
-
-fn default_value<T>() -> Option<ValueSet<T>>
-where
-    T: ValueMatcher + std::fmt::Debug,
-{
-    None
 }
 
 impl<T> ValueOperatorCondition<T>
@@ -92,7 +87,7 @@ where
     }
 }
 // --- Condition Operators, extended with pattern matching variants ---
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, JsonSchema)]
 pub enum ConditionOperator {
     Equal,
     Greater,
@@ -168,8 +163,9 @@ impl Serialize for ConditionOperator {
 
 // --- Generic ValueSet and ValueCondition types ---
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(untagged, deny_unknown_fields)]
+#[schemars(bound = "T: JsonSchema")]
 pub enum ValueSet<T>
 where
     T: ValueMatcher + std::fmt::Debug,

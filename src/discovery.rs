@@ -1,7 +1,9 @@
 use homie5::{
-    extensions::MetaControllerProtocol, DeviceRef, Homie5ControllerProtocol, Homie5Message,
-    HomieDomain, HomieID, HomieValue, PropertyRef, ToTopic,
+    DeviceRef, Homie5ControllerProtocol, Homie5Message, HomieDomain, HomieID, HomieValue,
+    PropertyRef, ToTopic,
 };
+#[cfg(feature = "ext-meta")]
+use homie5::extensions::meta::{self, MetaMessage};
 use rumqttc::ClientError;
 use thiserror::Error;
 
@@ -20,7 +22,8 @@ pub enum DiscoveryError {
 #[derive(Clone)]
 pub struct HomieDiscovery {
     client: Homie5ControllerProtocol,
-    meta_client: MetaControllerProtocol,
+    #[cfg(feature = "ext-meta")]
+    meta_client: meta::MetaControllerProtocol,
     mqtt_client: HomieMQTTClient,
 }
 
@@ -29,7 +32,8 @@ impl HomieDiscovery {
         Self {
             mqtt_client,
             client: Homie5ControllerProtocol::new(),
-            meta_client: MetaControllerProtocol::new(),
+            #[cfg(feature = "ext-meta")]
+            meta_client: meta::MetaControllerProtocol::new(),
         }
     }
 
@@ -40,6 +44,15 @@ impl HomieDiscovery {
         self.mqtt_client
             .homie_subscribe(self.client.subscribe_broadcast(homie_domain))
             .await?;
+        #[cfg(feature = "ext-meta")]
+        {
+            self.mqtt_client
+                .homie_subscribe(self.meta_client.subscribe_provider_discovery(homie_domain))
+                .await?;
+            self.mqtt_client
+                .homie_subscribe(self.meta_client.subscribe_all_overlays(homie_domain))
+                .await?;
+        }
         Ok(())
     }
 
@@ -50,6 +63,15 @@ impl HomieDiscovery {
         self.mqtt_client
             .homie_unsubscribe(self.client.unsubscribe_broadcast(homie_domain))
             .await?;
+        #[cfg(feature = "ext-meta")]
+        {
+            self.mqtt_client
+                .homie_unsubscribe(self.meta_client.unsubscribe_provider_discovery(homie_domain))
+                .await?;
+            self.mqtt_client
+                .homie_unsubscribe(self.meta_client.unsubscribe_all_overlays(homie_domain))
+                .await?;
+        }
         Ok(())
     }
 
@@ -63,9 +85,6 @@ impl HomieDiscovery {
                 DeviceUpdate::Added(device_ref) => {
                     self.mqtt_client
                         .homie_subscribe(self.client.subscribe_device(device_ref))
-                        .await?;
-                    self.mqtt_client
-                        .homie_subscribe(self.meta_client.subscribe_for_device(device_ref))
                         .await?;
                     Some(DiscoveryAction::NewDevice {
                         device,
@@ -93,19 +112,10 @@ impl HomieDiscovery {
                         self.mqtt_client
                             .homie_unsubscribe(self.client.unsubscribe_props(device_ref, &from))
                             .await?;
-                        self.mqtt_client
-                            .homie_unsubscribe(
-                                self.meta_client
-                                    .unsubscribe_for_nodes_props(device_ref, &from),
-                            )
-                            .await?;
                     }
 
                     self.mqtt_client
                         .homie_subscribe(self.client.subscribe_props(device_ref, to))
-                        .await?;
-                    self.mqtt_client
-                        .homie_subscribe(self.meta_client.subscribe_for_nodes_props(device_ref, to))
                         .await?;
                     Some(DiscoveryAction::DeviceDescriptionChanged(device))
                 }
@@ -133,9 +143,6 @@ impl HomieDiscovery {
                 self.mqtt_client
                     .homie_unsubscribe(self.client.unsubscribe_device(&device))
                     .await?;
-                self.mqtt_client
-                    .homie_unsubscribe(self.meta_client.unsubscribe_for_device(&device))
-                    .await?;
 
                 let DeviceRemove::Removed(dev) = devices.remove_device(&device) else {
                     return Ok(None);
@@ -148,22 +155,57 @@ impl HomieDiscovery {
                 self.mqtt_client
                     .homie_unsubscribe(self.client.unsubscribe_props(&device, description))
                     .await?;
-                self.mqtt_client
-                    .homie_unsubscribe(
-                        self.meta_client
-                            .unsubscribe_for_nodes_props(&device, description),
-                    )
-                    .await?;
 
                 log::info!("============> Removed device {}", dev.device_id());
-                //Some(HomieAction::DeviceRemoved(device.clone()))
-                None
+                Some(DiscoveryAction::DeviceRemoved(dev))
             }
             _ => Some(DiscoveryAction::Unhandled(event)),
         };
-        //log::debug!("Handle event action result {:?}", action);
 
         Ok(action)
+    }
+
+    /// Handle a parsed `MetaMessage` from the `$meta` overlay namespace.
+    ///
+    /// Returns the corresponding `DiscoveryAction` for the caller to process.
+    #[cfg(feature = "ext-meta")]
+    pub fn handle_meta_event(&self, event: MetaMessage) -> Option<DiscoveryAction> {
+        match event {
+            MetaMessage::ProviderInfo {
+                homie_domain,
+                provider_id,
+                info,
+            } => Some(DiscoveryAction::MetaProviderDiscovered {
+                homie_domain,
+                provider_id,
+                info,
+            }),
+            MetaMessage::ProviderRemoval {
+                homie_domain,
+                provider_id,
+            } => Some(DiscoveryAction::MetaProviderRemoved {
+                homie_domain,
+                provider_id,
+            }),
+            MetaMessage::DeviceOverlay {
+                provider_id,
+                device_id,
+                overlay,
+                ..
+            } => Some(DiscoveryAction::MetaDeviceOverlayChanged {
+                provider_id,
+                device_id,
+                overlay,
+            }),
+            MetaMessage::DeviceOverlayRemoval {
+                provider_id,
+                device_id,
+                ..
+            } => Some(DiscoveryAction::MetaDeviceOverlayRemoved {
+                provider_id,
+                device_id,
+            }),
+        }
     }
 
     fn update_prop_value(

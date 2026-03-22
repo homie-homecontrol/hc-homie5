@@ -5,10 +5,11 @@ use homie5::{
     },
     HomieDataType, HomieDomain, HomieID, PropertyRef,
 };
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashSet;
 
-#[derive(Default, Debug, Clone, Deserialize)]
+#[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 pub struct PropertyQuery {
     pub id: Option<ValueCondition<HomieID>>,
     pub name: Option<ValueCondition<String>>,
@@ -53,7 +54,7 @@ impl PropertyQuery {
     }
 }
 
-#[derive(Default, Debug, Clone, Deserialize)]
+#[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 pub struct NodeQuery {
     pub id: Option<ValueCondition<HomieID>>,
     pub name: Option<ValueCondition<String>>,
@@ -74,7 +75,7 @@ impl NodeQuery {
     }
 }
 
-#[derive(Default, Debug, Clone, Deserialize)]
+#[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 pub struct DeviceQuery {
     pub id: Option<ValueCondition<HomieID>>,
     pub name: Option<ValueCondition<String>>,
@@ -121,7 +122,7 @@ impl DeviceQuery {
     }
 }
 
-#[derive(Default, Debug, Clone, Deserialize)]
+#[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 pub struct QueryDefinition {
     #[serde(default)]
     pub domain: Option<ValueCondition<HomieDomain>>,
@@ -271,17 +272,17 @@ property:
                     .r#type("test-type")
                     .add_property(
                         HomieID::new_const("prop-1"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Integer)
-                            .format(HomiePropertyFormat::IntegerRange(IntegerRange {
+                        PropertyDescriptionBuilder::integer()
+                            .integer_range(IntegerRange {
                                 min: Some(1),
                                 max: Some(20),
                                 step: None,
-                            }))
+                            })
                             .build(),
                     )
                     .add_property(
                         HomieID::new_const("prop-2"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Float).build(),
+                        PropertyDescriptionBuilder::float().build(),
                     )
                     .build(),
             )
@@ -291,12 +292,12 @@ property:
                     .name("Testnode no 2")
                     .add_property(
                         HomieID::new_const("state"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Integer)
-                            .format(HomiePropertyFormat::IntegerRange(IntegerRange {
+                        PropertyDescriptionBuilder::integer()
+                            .integer_range(IntegerRange {
                                 min: Some(1),
                                 max: Some(20),
                                 step: None,
-                            }))
+                            })
                             .build(),
                     )
                     .build(),

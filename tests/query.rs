@@ -2,10 +2,9 @@
 mod tests {
     use hc_homie5::*;
     use homie5::device_description::{
-        DeviceDescriptionBuilder, HomiePropertyFormat, IntegerRange, NodeDescriptionBuilder,
-        PropertyDescriptionBuilder,
+        DeviceDescriptionBuilder, IntegerRange, NodeDescriptionBuilder, PropertyDescriptionBuilder,
     };
-    use homie5::{HomieDataType, HomieDomain, HomieID, PropertyRef};
+    use homie5::{HomieDomain, HomieID, PropertyRef};
 
     // A basic QueryDefinition test that exercises the full matching logic.
     #[test]
@@ -31,21 +30,21 @@ property:
                     .r#type("test-type")
                     .add_property(
                         HomieID::new_const("prop-1"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Integer)
-                            .format(HomiePropertyFormat::IntegerRange(IntegerRange {
+                        PropertyDescriptionBuilder::integer()
+                            .integer_range(IntegerRange {
                                 min: Some(1),
                                 max: Some(20),
                                 step: None,
-                            }))
+                            })
                             .build(),
                     )
                     .add_property(
                         HomieID::new_const("prop-2"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Float).build(),
+                        PropertyDescriptionBuilder::float().build(),
                     )
                     .add_property(
                         HomieID::new_const("prop-3"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Boolean).build(),
+                        PropertyDescriptionBuilder::boolean().build(),
                     )
                     .build(),
             )
@@ -55,12 +54,12 @@ property:
                     .name("Testnode no 2")
                     .add_property(
                         HomieID::new_const("state"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Integer)
-                            .format(HomiePropertyFormat::IntegerRange(IntegerRange {
+                        PropertyDescriptionBuilder::integer()
+                            .integer_range(IntegerRange {
                                 min: Some(1),
                                 max: Some(20),
                                 step: None,
-                            }))
+                            })
                             .build(),
                     )
                     .build(),
@@ -203,13 +202,13 @@ property:
                     .name("Test Node")
                     .add_property(
                         HomieID::new_const("temp"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Float)
+                        PropertyDescriptionBuilder::float()
                             .name("temperature")
                             .build(),
                     )
                     .add_property(
                         HomieID::new_const("humidity"),
-                        PropertyDescriptionBuilder::new(HomieDataType::Float)
+                        PropertyDescriptionBuilder::float()
                             .name("humidity")
                             .build(),
                     )
