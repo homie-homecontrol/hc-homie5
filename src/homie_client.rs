@@ -1,10 +1,11 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
 use homie5::{client::LastWill, parse_mqtt_message, Homie5Message};
 #[cfg(feature = "ext-meta")]
 use homie5::extensions::meta::parse_meta_message;
 use rand::{distr::Alphanumeric, rng, RngExt};
-use rumqttc::{AsyncClient, ClientError, ConnectionError, MqttOptions};
+use rumqttc::{AsyncClient, ClientError, ConnectionError, MqttOptions, Transport};
 use thiserror::Error;
 use tokio::{
     sync::{
@@ -24,6 +25,8 @@ pub enum HomieClientError {
     JoinError(#[from] JoinError),
     #[error("Hhomie client channel is closed. Error sending event via mpsc::channel.")]
     ChannelClosed,
+    #[error("TLS configuration error: {0}")]
+    TlsConfig(String),
 }
 impl From<SendError<HomieClientEvent>> for HomieClientError {
     fn from(_: SendError<HomieClientEvent>) -> Self {
@@ -44,6 +47,10 @@ pub struct MqttClientConfig {
     pub max_packet_size_incoming: usize,
     pub max_packet_size_outgoing: usize,
     pub clean_session: bool,
+    pub use_tls: bool,
+    pub ca_path: Option<PathBuf>,
+    pub client_cert_path: Option<PathBuf>,
+    pub client_key_path: Option<PathBuf>,
 }
 
 impl MqttClientConfig {
@@ -62,7 +69,11 @@ impl MqttClientConfig {
             keep_alive: 5,
             max_packet_size_incoming: 512 * 1024,
             max_packet_size_outgoing: 512 * 1024,
-            clean_session: true, // Default value
+            clean_session: true,
+            use_tls: false,
+            ca_path: None,
+            client_cert_path: None,
+            client_key_path: None,
         }
     }
 
@@ -129,7 +140,27 @@ impl MqttClientConfig {
         self
     }
 
-    pub fn to_mqtt_options(&self) -> MqttOptions {
+    pub fn use_tls(mut self, use_tls: bool) -> Self {
+        self.use_tls = use_tls;
+        self
+    }
+
+    pub fn ca_path(mut self, ca_path: Option<impl Into<PathBuf>>) -> Self {
+        self.ca_path = ca_path.map(|p| p.into());
+        self
+    }
+
+    pub fn client_cert_path(mut self, client_cert_path: Option<impl Into<PathBuf>>) -> Self {
+        self.client_cert_path = client_cert_path.map(|p| p.into());
+        self
+    }
+
+    pub fn client_key_path(mut self, client_key_path: Option<impl Into<PathBuf>>) -> Self {
+        self.client_key_path = client_key_path.map(|p| p.into());
+        self
+    }
+
+    pub fn to_mqtt_options(&self) -> Result<MqttOptions, HomieClientError> {
         let client_id = if self.client_id.is_none() {
             format!(
                 "homie5-{}",
@@ -155,7 +186,59 @@ impl MqttClientConfig {
         if let Some(last_will) = &self.last_will {
             mqttoptions.set_last_will(HomieMQTTClient::map_last_will(last_will.clone()));
         }
-        mqttoptions
+
+        if self.use_tls {
+            let ca = match &self.ca_path {
+                Some(path) => std::fs::read(path).map_err(|e| {
+                    HomieClientError::TlsConfig(format!(
+                        "failed to read CA certificate '{}': {e}",
+                        path.display()
+                    ))
+                })?,
+                None => Vec::new(),
+            };
+
+            let client_auth = match (&self.client_cert_path, &self.client_key_path) {
+                (Some(cert_path), Some(key_path)) => {
+                    let cert = std::fs::read(cert_path).map_err(|e| {
+                        HomieClientError::TlsConfig(format!(
+                            "failed to read client certificate '{}': {e}",
+                            cert_path.display()
+                        ))
+                    })?;
+                    let key = std::fs::read(key_path).map_err(|e| {
+                        HomieClientError::TlsConfig(format!(
+                            "failed to read client key '{}': {e}",
+                            key_path.display()
+                        ))
+                    })?;
+                    Some((cert, key))
+                }
+                (Some(_), None) => {
+                    return Err(HomieClientError::TlsConfig(
+                        "client_cert_path requires client_key_path".to_string(),
+                    ));
+                }
+                (None, Some(_)) => {
+                    return Err(HomieClientError::TlsConfig(
+                        "client_key_path requires client_cert_path".to_string(),
+                    ));
+                }
+                (None, None) => None,
+            };
+
+            let transport = if ca.is_empty() && client_auth.is_none() {
+                Transport::tls_with_default_config()
+            } else if ca.is_empty() {
+                Transport::tls_with_default_config()
+            } else {
+                Transport::tls(ca, client_auth, None)
+            };
+
+            mqttoptions.set_transport(transport);
+        }
+
+        Ok(mqttoptions)
     }
 }
 
