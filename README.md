@@ -7,7 +7,7 @@ It builds on the protocol crate [`homie5`](https://crates.io/crates/homie5) and 
 - a concrete MQTT runtime integration via `rumqttc`
 - device-side traits and macros for publishing Homie devices
 - controller-side discovery and in-memory state stores
-- reusable query, value-condition, and value-mapping utilitiesnc
+- reusable query, value-condition, and value-mapping utilities
 - async helpers used by bridge and controller applications
 
 This crate is used by other Homecontrol applications such as bridges, automation, dashboard, API, and logger services.
@@ -79,6 +79,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (_handle, _mqtt_client, mut _events) = run_homie_client(mqtt_options, 1024)?;
 
     // Consume events and route them into discovery / application logic.
+    Ok(())
+}
+```
+
+### 3) Controller example with `DeviceManager`
+
+```rust,no_run
+use hc_homie5::{DeviceManager, HomieClientEvent, HomieSettings};
+use homie5::HomieDomain;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let settings = HomieSettings::from_env("HC", "hc-", HomieDomain::Default);
+    let config = settings.to_mqtt_client_config();
+
+    let (manager, _handle, mut events) = DeviceManager::new(settings.homie_domain.clone(), &config)?;
+
+    manager.discover().await?;
+
+    while let Some(event) = events.recv().await {
+        match event {
+            HomieClientEvent::Connect => {
+                // Connected to MQTT broker
+            }
+            HomieClientEvent::HomieMessage(msg) => {
+                if let Some(action) = manager.discovery_handle_event(msg).await? {
+                    // React to discovery changes (new device, value updates, removals, ...)
+                    println!("discovery action: {action:?}");
+                }
+            }
+            HomieClientEvent::Disconnect | HomieClientEvent::Stop => break,
+            HomieClientEvent::Error(err) => {
+                eprintln!("homie client error: {err}");
+                break;
+            }
+            #[cfg(feature = "ext-meta")]
+            HomieClientEvent::MetaMessage(_msg) => {
+                // Optional: process meta extension events
+            }
+        }
+    }
+
     Ok(())
 }
 ```
