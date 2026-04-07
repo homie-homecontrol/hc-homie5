@@ -5,6 +5,7 @@ mod controller_client;
 #[cfg(feature = "homie_client")]
 mod device_manager;
 mod device_store;
+mod device_alerts;
 #[cfg(feature = "homie_client")]
 mod discovery;
 mod event_multiplexer;
@@ -43,6 +44,7 @@ pub use debounced_sender::*;
 #[cfg(feature = "tokio")]
 pub use delayed_sender::*;
 pub use device_store::*;
+pub use device_alerts::*;
 #[cfg(feature = "homie_client")]
 pub use discovery::*;
 #[cfg(feature = "homie_client")]

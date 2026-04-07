@@ -221,7 +221,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -355,6 +355,7 @@ version = "0.7.2"
 dependencies = [
  "chrono",
  "hc-homie5-macros",
+ "hc-homie5-smarthome",
  "homie5",
  "log",
  "paste",
@@ -378,6 +379,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "hc-homie5-smarthome"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ee5b66bf76863409eedc33a3e7f1d6f30ee6078e35dadb4b91d13c01aa6e9db"
+dependencies = [
+ "chrono",
+ "homie5",
+ "serde",
 ]
 
 [[package]]
