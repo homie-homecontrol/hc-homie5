@@ -4,10 +4,12 @@ use homie5::{Homie5ControllerProtocol, Homie5Message, HomieDomain, HomieValue, P
 use tokio::sync::{mpsc, RwLock};
 
 use crate::{
-    controller_client::HomieControllerClient, run_homie_client, DeviceStore, DiscoveryAction,
-    DiscoveryError, HomieClientError, HomieClientEvent, HomieClientHandle, HomieDiscovery,
-    MqttClientConfig,
+    client::{run_homie_client, HomieClientError, HomieClientEvent, HomieClientHandle, MqttClientConfig},
+    model::DiscoveryAction,
+    store::DeviceStore,
 };
+
+use super::{HomieControllerClient, HomieDiscovery, DiscoveryError};
 
 #[derive(Clone)]
 pub struct DeviceManager {
@@ -66,7 +68,7 @@ impl DeviceManager {
         message: Homie5Message,
     ) -> Result<Option<DiscoveryAction>, DiscoveryError> {
         let mut devices = self.devices.write().await;
-        Ok(self.discovery.handle_event(message, &mut devices).await?)
+        self.discovery.handle_event(message, &mut devices).await
     }
 
     pub async fn set_command(

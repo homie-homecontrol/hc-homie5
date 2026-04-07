@@ -1,6 +1,6 @@
 use homie5::{Homie5DeviceProtocol, HomieID};
 
-use crate::HomieMQTTClient;
+use crate::client::HomieMQTTClient;
 
 use super::{AlertApplyStats, AlertEngine, AlertObservation, AlertOp, AlertSpec, ReconcileMode};
 

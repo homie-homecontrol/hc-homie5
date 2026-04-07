@@ -1,21 +1,16 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use homie5::{client::LastWill, parse_mqtt_message, Homie5Message};
-#[cfg(feature = "ext-meta")]
-use homie5::extensions::meta::parse_meta_message;
+use homie5::client::LastWill;
 use rand::{distr::Alphanumeric, rng, RngExt};
-use rumqttc::{AsyncClient, ClientError, ConnectionError, MqttOptions, Transport};
+use rumqttc::{ClientError, MqttOptions, Transport};
 use thiserror::Error;
 use tokio::{
-    sync::{
-        mpsc::{self, error::SendError, Receiver},
-        watch,
-    },
+    sync::mpsc::error::SendError,
     task::JoinError,
 };
 
-use crate::HomieMQTTClient;
+use super::{HomieClientEvent, HomieMQTTClient};
 
 #[derive(Debug, Error)]
 pub enum HomieClientError {
@@ -51,6 +46,10 @@ pub struct MqttClientConfig {
     pub ca_path: Option<PathBuf>,
     pub client_cert_path: Option<PathBuf>,
     pub client_key_path: Option<PathBuf>,
+    /// Maximum time the client will retry after disconnect before giving up.
+    /// When exceeded, `HomieClientEvent::Stop` is sent.
+    /// Default: `None` (retry forever).
+    pub max_disconnect: Option<Duration>,
 }
 
 impl MqttClientConfig {
@@ -74,6 +73,7 @@ impl MqttClientConfig {
             ca_path: None,
             client_cert_path: None,
             client_key_path: None,
+            max_disconnect: None,
         }
     }
 
@@ -160,6 +160,14 @@ impl MqttClientConfig {
         self
     }
 
+    /// Set maximum time the client will retry after disconnect before giving up.
+    /// When exceeded, `HomieClientEvent::Stop` is sent with a log message.
+    /// Default: `None` (retry forever).
+    pub fn max_disconnect(mut self, duration: Option<Duration>) -> Self {
+        self.max_disconnect = duration;
+        self
+    }
+
     pub fn to_mqtt_options(&self) -> Result<MqttOptions, HomieClientError> {
         let client_id = if self.client_id.is_none() {
             format!(
@@ -227,9 +235,7 @@ impl MqttClientConfig {
                 (None, None) => None,
             };
 
-            let transport = if ca.is_empty() && client_auth.is_none() {
-                Transport::tls_with_default_config()
-            } else if ca.is_empty() {
+            let transport = if ca.is_empty() {
                 Transport::tls_with_default_config()
             } else {
                 Transport::tls(ca, client_auth, None)
@@ -240,145 +246,4 @@ impl MqttClientConfig {
 
         Ok(mqttoptions)
     }
-}
-
-#[derive(Debug)]
-pub enum HomieClientEvent {
-    Connect,
-    Disconnect,
-    Stop,
-    HomieMessage(Homie5Message),
-    #[cfg(feature = "ext-meta")]
-    MetaMessage(homie5::extensions::meta::MetaMessage),
-    Error(ConnectionError),
-}
-
-pub struct HomieClientHandle {
-    stop_sender: watch::Sender<bool>, // Shutdown signal
-    handle: tokio::task::JoinHandle<Result<(), HomieClientError>>,
-}
-
-impl HomieClientHandle {
-    /// Stops the watcher task.
-    pub async fn stop(self) -> Result<(), HomieClientError> {
-        let _ = self.stop_sender.send(true); // Send the shutdown signal
-        self.handle.await??;
-        Ok(())
-    }
-}
-
-pub fn run_homie_client(
-    mqttoptions: MqttOptions,
-    channel_size: usize,
-) -> Result<
-    (
-        HomieClientHandle,
-        HomieMQTTClient,
-        Receiver<HomieClientEvent>,
-    ),
-    HomieClientError,
-> {
-    log::trace!("Connecting to mqtt: {}", mqttoptions.client_id());
-    let (sender, receiver) = mpsc::channel(channel_size);
-
-    let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, channel_size);
-    let (stop_sender, mut stop_receiver) = watch::channel(false);
-
-    let handle = tokio::task::spawn(async move {
-        let mut connected = false;
-        loop {
-            let poll_res = tokio::select! {
-                poll_res = eventloop.poll() => poll_res,
-                _exit = stop_receiver.changed() => {
-                    if *stop_receiver.borrow() {
-                        log::trace!("Received stop signal. Exiting...");
-                        break;
-                    }
-                    continue;
-                }
-            };
-
-            match poll_res {
-                Ok(event) => match &event {
-                    rumqttc::Event::Incoming(rumqttc::Packet::Publish(p)) => {
-                        match parse_mqtt_message(&p.topic, &p.payload) {
-                            Ok(event) => {
-                                sender.send(HomieClientEvent::HomieMessage(event)).await?;
-                            }
-                            Err(homie_err) => {
-                                #[cfg(feature = "ext-meta")]
-                                {
-                                    match parse_meta_message(&p.topic, &p.payload) {
-                                        Ok(Some(meta_msg)) => {
-                                            sender.send(HomieClientEvent::MetaMessage(meta_msg)).await?;
-                                        }
-                                        Ok(None) => {
-                                            log::error!(
-                                                "Error parsing MQTT message.\n  Topic: [{}]\n  Payload: [{:?}]\n  Homie parse error: {}",
-                                                p.topic,
-                                                p.payload,
-                                                homie_err,
-                                            );
-                                        }
-                                        Err(meta_err) => {
-                                            log::error!(
-                                                "Error parsing MQTT message.\n  Topic: [{}]\n  Payload: [{:?}]\n  Homie parse error: {}\n  Meta parse error: {}",
-                                                p.topic,
-                                                p.payload,
-                                                homie_err,
-                                                meta_err
-                                            );
-                                        }
-                                    }
-                                }
-                                #[cfg(not(feature = "ext-meta"))]
-                                {
-                                    log::error!(
-                                        "Error parsing MQTT message.\n  Topic: [{}]\n  Payload: [{:?}]\n  Homie parse error: {}",
-                                        p.topic,
-                                        p.payload,
-                                        homie_err,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    rumqttc::Event::Incoming(rumqttc::Incoming::ConnAck(_)) => {
-                        log::trace!("HOMIE: Connected");
-                        connected = true;
-                        sender.send(HomieClientEvent::Connect).await?;
-                    }
-                    rumqttc::Event::Outgoing(rumqttc::Outgoing::Disconnect) => {
-                        log::trace!("HOMIE: Connection closed from our side.",);
-                        sender.send(HomieClientEvent::Disconnect).await?;
-
-                        break;
-                    }
-                    _ => {}
-                },
-
-                Err(err) => {
-                    if connected {
-                        connected = false;
-                        sender.send(HomieClientEvent::Disconnect).await?;
-                    }
-
-                    log::error!("HomieClient: Error connecting mqtt. {:#?}", err);
-                    sender.send(HomieClientEvent::Error(err)).await?;
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            };
-        }
-        sender.send(HomieClientEvent::Stop).await?;
-        log::trace!("Exiting homie client eventloop...");
-        Ok(())
-    });
-    Ok((
-        HomieClientHandle {
-            handle,
-            stop_sender,
-        },
-        HomieMQTTClient::new(mqtt_client),
-        receiver,
-    ))
 }

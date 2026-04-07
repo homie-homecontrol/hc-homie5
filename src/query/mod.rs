@@ -1,4 +1,4 @@
-use crate::value_condition::ValueCondition;
+use crate::value::ValueCondition;
 use homie5::{
     device_description::{
         HomieDeviceDescription, HomieNodeDescription, HomiePropertyDescription, HomiePropertyFormat,

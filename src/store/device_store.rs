@@ -7,11 +7,9 @@ use std::collections::{
     HashMap,
 };
 
-use crate::{
-    AlertStore, DescriptionUpdate, Device, DeviceRemove, DeviceUpdate, PropertyValueEntry,
-};
+use crate::model::{DescriptionUpdate, Device, DeviceRemove, DeviceUpdate, PropertyValueEntry};
 
-use super::PropertyValueStore;
+use super::{AlertStore, PropertyValueStore};
 
 pub type DeviceMap = HashMap<HomieID, Device>;
 #[derive(Default, Clone)]

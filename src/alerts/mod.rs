@@ -2,7 +2,7 @@ mod engine;
 
 pub use engine::*;
 
-#[cfg(feature = "homie_client")]
+#[cfg(feature = "framework")]
 mod publisher;
-#[cfg(feature = "homie_client")]
+#[cfg(feature = "framework")]
 pub use publisher::*;

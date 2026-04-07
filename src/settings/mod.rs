@@ -4,7 +4,8 @@ use std::str::FromStr;
 use homie5::{HomieDomain, HomieID};
 use rand::{distr::Alphanumeric, rng, RngExt};
 
-use crate::{MqttClientConfig, UnwrapOrExit};
+use crate::client::MqttClientConfig;
+use crate::util::UnwrapOrExit;
 
 // ── Prefixed env-var helpers ────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
-mod device_store;
+mod device;
 mod discovery;
-mod property_value_store;
+mod property_value;
 
-pub use device_store::*;
+pub use device::*;
 pub use discovery::*;
-pub use property_value_store::*;
+pub use property_value::*;

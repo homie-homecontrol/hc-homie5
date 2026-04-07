@@ -8,8 +8,9 @@ use rumqttc::ClientError;
 use thiserror::Error;
 
 use crate::{
-    device_store::DeviceStore, AlertUpdate, DescriptionUpdate, DeviceRemove, DeviceUpdate,
-    DiscoveryAction, HomieMQTTClient, ValueUpdate,
+    client::HomieMQTTClient,
+    model::{DescriptionUpdate, DeviceRemove, DeviceUpdate, DiscoveryAction, ValueUpdate},
+    store::{AlertUpdate, DeviceStore},
 };
 
 #[derive(Debug, Error)]

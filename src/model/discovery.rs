@@ -3,7 +3,7 @@ use homie5::{DeviceRef, Homie5Message, HomieDeviceStatus, HomieID, HomieValue, P
 #[cfg(feature = "ext-meta")]
 use homie5::HomieDomain;
 
-use crate::Device;
+use super::Device;
 
 #[derive(Debug, Clone)]
 pub enum DiscoveryAction {
