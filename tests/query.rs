@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use hc_homie5::*;
+    use hc_homie5::query::*;
+    use hc_homie5::value::*;
     use homie5::device_description::{
         DeviceDescriptionBuilder, IntegerRange, NodeDescriptionBuilder, PropertyDescriptionBuilder,
     };

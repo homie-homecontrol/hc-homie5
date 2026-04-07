@@ -1,6 +1,6 @@
 use homie5::{Homie5ControllerProtocol, HomieValue, PropertyRef};
 
-use crate::HomieMQTTClient;
+use crate::client::HomieMQTTClient;
 
 #[derive(Clone)]
 pub struct HomieControllerClient {

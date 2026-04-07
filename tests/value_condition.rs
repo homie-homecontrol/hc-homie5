@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use hc_homie5::*;
+    use hc_homie5::value::*;
 
     // Test that a literal condition uses the default literal matching.
     #[test]

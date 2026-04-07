@@ -4,7 +4,7 @@ use homie5::{
     Homie5DeviceProtocol, HomieDeviceStatus, HomieDomain, HomieID, PropertyRef,
 };
 
-use super::HomieMQTTClient;
+use crate::client::HomieMQTTClient;
 
 pub trait HomieDeviceCore {
     fn homie_domain(&self) -> &HomieDomain;

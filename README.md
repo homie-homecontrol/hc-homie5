@@ -8,50 +8,46 @@ It builds on the protocol crate [`homie5`](https://crates.io/crates/homie5) and 
 - device-side traits and macros for publishing Homie devices
 - controller-side discovery and in-memory state stores
 - reusable query, value-condition, and value-mapping utilities
+- an alert engine for health monitoring
 - async helpers used by bridge and controller applications
 
 This crate is used by other Homecontrol applications such as bridges, automation, dashboard, API, and logger services.
 
-## What this crate provides
+## Module structure
 
-### Device-side building blocks
+The public API is organized into domain-oriented submodules:
 
-- `HomieDeviceCore` and `HomieDevice` traits for implementing Homie devices
-- lifecycle helpers for publishing, disconnecting, and unpublishing devices
-- optional proc-macro support (`#[homie_device]`, `#[homie_device_enum]`) via `hc-homie5-macros`
+| Module | Feature | Description |
+|--------|---------|-------------|
+| `store` | base | `DeviceStore`, `PropertyValueStore`, `AlertStore` — in-memory state |
+| `model` | base | `Device`, `PropertyValueEntry`, `DiscoveryAction` — data types |
+| `query` | base | `QueryDefinition`, `MaterializedQuery` — property filtering |
+| `value` | base | `ValueCondition`, `ValueMapping`, `ValueMappingIO` — matching/mapping |
+| `connection` | base | `ConnectionState`, `ConnectionEvent` — connection lifecycle FSM |
+| `alerts` | base | `AlertSpec`, `AlertEngine`, `AlertState` — alert engine |
+| `util` | base | `UniqueByIter` and other helpers |
+| `client` | framework | `run_homie_client()`, `MqttClientConfig`, `HomieClientEvent` — MQTT integration |
+| `device` | framework | `HomieDeviceCore`, `HomieDevice` traits — device-side building blocks |
+| `controller` | framework | `DeviceManager`, `HomieDiscovery`, `HomieControllerClient` — controller-side |
+| `settings` | framework | `HomieSettings` — env-driven configuration |
 
-### Controller-side building blocks
-
-- `run_homie_client(...)` for running a Homie-aware MQTT event loop
-- `HomieDiscovery` for handling incoming Homie messages and tracking lifecycle changes
-- `DeviceStore`, `PropertyValueStore`, and `AlertStore` for in-memory state
-- `DiscoveryAction` events for reacting to discovered changes
-- `HomieControllerClient` for sending set commands
-
-### Shared utilities
-
-- `MqttClientConfig` and `HomieSettings` (env-driven config)
-- `ConnectionState` finite state machine
-- `QueryDefinition` and `MaterializedQuery` for filtering properties
-- `ValueCondition`, `ValueMapping`, and `ValueMappingIO` for rule-like matching/mapping
-- `define_event_multiplexer!` macro for multi-source async event loops
-- `DebouncedSender` and `DelayedSender`
+Async utilities (`DebouncedSender`, `DelayedSender`) and the `define_event_multiplexer!` macro require the `tokio` feature.
 
 ## Features
 
-Default features are enabled: `base`, `macros`, `homie_client`, `tokio`.
+Default features: `base`, `macros`, `framework`, `tokio`.
 
-- `base`: stores, models, query, value-condition/mapping, connection state
-- `macros`: re-exports `hc-homie5-macros`
-- `homie_client`: MQTT client integration (`rumqttc`), discovery, settings, device traits
-- `tokio`: async utilities and signal handling
+- `base`: stores, models, query, value-condition/mapping, connection state, alerts (WASM-safe)
+- `macros`: re-exports `hc-homie5-macros` (`#[homie_device]`, `#[homie_device_enum]`)
+- `framework`: MQTT client integration (`rumqttc`), discovery, settings, device/controller traits
+- `tokio`: async utilities (`DebouncedSender`, `DelayedSender`) and signal handling
 - `ext-meta`: enables Homie meta extension integration (forwarded from `homie5/ext-meta`)
 
 Use minimal features when needed, for example:
 
 ```toml
 [dependencies]
-hc-homie5 = { version = "0.7", default-features = false, features = ["base"] }
+hc-homie5 = { version = "0.8", default-features = false, features = ["base"] }
 ```
 
 ## Quick start
@@ -60,7 +56,7 @@ hc-homie5 = { version = "0.7", default-features = false, features = ["base"] }
 
 ```toml
 [dependencies]
-hc-homie5 = "0.7"
+hc-homie5 = "0.8"
 homie5 = "0.10"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
@@ -68,7 +64,8 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ### 2) Build MQTT options and run client loop
 
 ```rust,no_run
-use hc_homie5::{run_homie_client, HomieSettings};
+use hc_homie5::client::run_homie_client;
+use hc_homie5::settings::HomieSettings;
 use homie5::HomieDomain;
 
 #[tokio::main]
@@ -86,7 +83,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### 3) Controller example with `DeviceManager`
 
 ```rust,no_run
-use hc_homie5::{DeviceManager, HomieClientEvent, HomieSettings};
+use hc_homie5::client::HomieClientEvent;
+use hc_homie5::controller::DeviceManager;
+use hc_homie5::settings::HomieSettings;
 use homie5::HomieDomain;
 
 #[tokio::main]

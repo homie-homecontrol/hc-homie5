@@ -4,7 +4,7 @@ use homie5::{
 #[cfg(feature = "ext-meta")]
 use std::collections::HashMap;
 
-use crate::{AlertStore, PropertyValueStore};
+use crate::store::{AlertStore, PropertyValueStore};
 
 pub enum DeviceUpdate<'a> {
     Added(&'a DeviceRef),

@@ -68,7 +68,7 @@ where
 #[macro_export]
 macro_rules! impl_value_matcher_for_vec {
     ($t:ty) => {
-        impl $crate::ValueMatcher for Vec<$t> {
+        impl $crate::value::ValueMatcher for Vec<$t> {
             fn as_match_str(&self) -> &str {
                 ""
             }
@@ -78,24 +78,24 @@ macro_rules! impl_value_matcher_for_vec {
 
             fn matches(
                 &self,
-                operator: $crate::ConditionOperator,
-                operand: Option<&$crate::ValueSet<Self>>,
+                operator: $crate::value::ConditionOperator,
+                operand: Option<&$crate::value::ValueSet<Self>>,
             ) -> bool {
                 match operator {
-                    $crate::ConditionOperator::Equal => match operand {
-                        Some($crate::ValueSet::Single(value)) => {
+                    $crate::value::ConditionOperator::Equal => match operand {
+                        Some($crate::value::ValueSet::Single(value)) => {
                             value.len() == self.len() && value.iter().all(|v| self.contains(v))
                         }
-                        Some($crate::ValueSet::Multiple(values)) => values.iter().any(|va| {
+                        Some($crate::value::ValueSet::Multiple(values)) => values.iter().any(|va| {
                             va.len() == self.len() && va.iter().all(|v| self.contains(v))
                         }),
                         _ => false,
                     },
-                    $crate::ConditionOperator::NotEqual => match operand {
-                        Some($crate::ValueSet::Single(value)) => {
+                    $crate::value::ConditionOperator::NotEqual => match operand {
+                        Some($crate::value::ValueSet::Single(value)) => {
                             value.len() != self.len() || value.iter().any(|v| !self.contains(v))
                         }
-                        Some($crate::ValueSet::Multiple(values)) => {
+                        Some($crate::value::ValueSet::Multiple(values)) => {
                             // Return true if no matching vector is found in `values`
                             values.iter().all(|va| {
                                 va.len() != self.len() || va.iter().any(|v| !self.contains(v))
@@ -103,25 +103,25 @@ macro_rules! impl_value_matcher_for_vec {
                         }
                         _ => true, // If no value is specified, treat as "not equal"
                     },
-                    $crate::ConditionOperator::IncludesAny => match operand {
-                        Some($crate::ValueSet::Single(value)) => {
+                    $crate::value::ConditionOperator::IncludesAny => match operand {
+                        Some($crate::value::ValueSet::Single(value)) => {
                             value.iter().any(|v| self.contains(v))
                         }
-                        Some($crate::ValueSet::Multiple(values)) => {
+                        Some($crate::value::ValueSet::Multiple(values)) => {
                             values.iter().any(|va| va.iter().any(|v| self.contains(v)))
                         }
                         _ => false,
                     },
-                    $crate::ConditionOperator::IncludesNone => match operand {
-                        Some($crate::ValueSet::Single(value)) => {
+                    $crate::value::ConditionOperator::IncludesNone => match operand {
+                        Some($crate::value::ValueSet::Single(value)) => {
                             value.iter().all(|v| !self.contains(v))
                         }
-                        Some($crate::ValueSet::Multiple(values)) => {
+                        Some($crate::value::ValueSet::Multiple(values)) => {
                             values.iter().all(|va| va.iter().all(|v| !self.contains(v)))
                         }
                         _ => false,
                     },
-                    $crate::ConditionOperator::MatchAlways => true,
+                    $crate::value::ConditionOperator::MatchAlways => true,
                     _ => false,
                 }
             }

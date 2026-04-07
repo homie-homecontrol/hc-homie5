@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use hc_homie5::*;
+    use hc_homie5::value::*;
 
     // For these tests we use String for both FROM and TO.
     // It is assumed that String implements ValueMatcher appropriately.

@@ -5,7 +5,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::{PropertyValueEntry, ValueUpdate};
+use crate::model::{PropertyValueEntry, ValueUpdate};
 
 #[derive(Default, Clone, Debug)]
 pub struct PropertyValueStore(HashMap<PropertyPointer, PropertyValueEntry>);
