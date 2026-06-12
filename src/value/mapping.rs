@@ -102,7 +102,7 @@ where
         self.input.map_to(value)
     }
 
-    pub fn map_ouput<'a>(&'a self, value: &'a IN) -> MappingResult<&'a IN, &'a OUT> {
+    pub fn map_output<'a>(&'a self, value: &'a IN) -> MappingResult<&'a IN, &'a OUT> {
         self.output.map_to(value)
     }
 }
