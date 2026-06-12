@@ -42,15 +42,15 @@ macro_rules! define_event_multiplexer {
                 }
 
                 // The `next` method to fetch the next event
-                pub async fn next(&mut self, timeout: u64) -> $enum_name {
+                pub async fn next(&mut self, timeout: std::time::Duration) -> $enum_name {
                     tokio::select! {
                         $(
                             Some(event) = self.$field_name.recv() => {
                                 $enum_name::$variant(event)
                             }
                         )*
-                        _ = tokio::time::sleep(std::time::Duration::from_secs(timeout)) => {
-                            log::debug!("Timeout waiting for events");
+                        _ = tokio::time::sleep(timeout) => {
+                            log::trace!("Timeout waiting for events");
                             $enum_name::Timeout
                         },
                         else => {
