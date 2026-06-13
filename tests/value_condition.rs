@@ -99,7 +99,7 @@ mod tests {
     fn test_deserialize_literal_condition_string() {
         // A literal condition is untagged so that a JSON string deserializes into ValueCondition::Value.
         let yaml = "\"literal_value\"";
-        let condition: ValueCondition<String> = serde_yml::from_str(yaml).unwrap();
+        let condition: ValueCondition<String> = serde_yaml_ng::from_str(yaml).unwrap();
         if let ValueCondition::Value(val) = condition {
             assert_eq!(val, "literal_value".to_string());
         } else {
@@ -114,7 +114,7 @@ mod tests {
             "operator": "=",
             "value": "test"
         }"#;
-        let condition: ValueCondition<String> = serde_yml::from_str(yaml).unwrap();
+        let condition: ValueCondition<String> = serde_yaml_ng::from_str(yaml).unwrap();
         if let ValueCondition::Operator(op_condition) = condition {
             assert_eq!(op_condition.operator, ConditionOperator::Equal);
             if let Some(ValueSet::Single(val)) = op_condition.value {
@@ -133,7 +133,7 @@ mod tests {
         let yaml = r#"{
             "pattern": "regex_pattern"
         }"#;
-        let condition: ValueCondition<String> = serde_yml::from_str(yaml).unwrap();
+        let condition: ValueCondition<String> = serde_yaml_ng::from_str(yaml).unwrap();
         if let ValueCondition::Pattern(pattern) = condition {
             assert_eq!(pattern.pattern, "regex_pattern".to_string());
         } else {
