@@ -32,10 +32,7 @@ impl MqttClientConfig {
         let (homie_proto, last_will) =
             Homie5DeviceProtocol::new(controller_id.clone(), domain.clone());
 
-        let mqtt_options = self
-            .clone()
-            .last_will(Some(last_will))
-            .to_mqtt_options()?;
+        let mqtt_options = self.clone().last_will(Some(last_will)).to_mqtt_options()?;
 
         #[cfg(feature = "ext-meta")]
         let meta_provider =

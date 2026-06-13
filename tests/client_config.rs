@@ -12,8 +12,8 @@ mod tests {
 
     #[test]
     fn test_max_disconnect_builder() {
-        let config = MqttClientConfig::new("localhost")
-            .max_disconnect(Some(Duration::from_secs(30)));
+        let config =
+            MqttClientConfig::new("localhost").max_disconnect(Some(Duration::from_secs(30)));
         assert_eq!(config.max_disconnect, Some(Duration::from_secs(30)));
     }
 

@@ -42,10 +42,27 @@ where
 }
 
 pub fn bool_setting(prefix: &str, name: &str, default: bool) -> bool {
-    std::env::var(env_name(prefix, name))
-        .ok()
-        .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes"))
-        .unwrap_or(default)
+    let env_var = env_name(prefix, name);
+    match std::env::var(&env_var) {
+        Ok(raw) => parse_bool_setting(&raw).unwrap_or_else(|| {
+            log::warn!(
+                "Invalid boolean setting {}={:?}; expected 'true' or 'false'. Using default: {}",
+                env_var,
+                raw,
+                default
+            );
+            default
+        }),
+        Err(_) => default,
+    }
+}
+
+fn parse_bool_setting(raw: &str) -> Option<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
 }
 
 pub fn optional_path_setting(prefix: &str, name: &str) -> Option<PathBuf> {
@@ -53,6 +70,24 @@ pub fn optional_path_setting(prefix: &str, name: &str) -> Option<PathBuf> {
         .ok()
         .filter(|s| !s.is_empty())
         .map(PathBuf::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_bool_setting;
+
+    #[test]
+    fn parse_bool_setting_accepts_true_and_false_only() {
+        assert_eq!(parse_bool_setting("true"), Some(true));
+        assert_eq!(parse_bool_setting("false"), Some(false));
+        assert_eq!(parse_bool_setting(" TRUE "), Some(true));
+        assert_eq!(parse_bool_setting("False"), Some(false));
+
+        assert_eq!(parse_bool_setting("1"), None);
+        assert_eq!(parse_bool_setting("yes"), None);
+        assert_eq!(parse_bool_setting("enabled"), None);
+        assert_eq!(parse_bool_setting(""), None);
+    }
 }
 
 // ── Direct env-var helpers (for crates with non-standard env var names) ─

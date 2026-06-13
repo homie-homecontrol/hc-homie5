@@ -86,9 +86,11 @@ macro_rules! impl_value_matcher_for_vec {
                         Some($crate::value::ValueSet::Single(value)) => {
                             value.len() == self.len() && value.iter().all(|v| self.contains(v))
                         }
-                        Some($crate::value::ValueSet::Multiple(values)) => values.iter().any(|va| {
-                            va.len() == self.len() && va.iter().all(|v| self.contains(v))
-                        }),
+                        Some($crate::value::ValueSet::Multiple(values)) => {
+                            values.iter().any(|va| {
+                                va.len() == self.len() && va.iter().all(|v| self.contains(v))
+                            })
+                        }
                         _ => false,
                     },
                     $crate::value::ConditionOperator::NotEqual => match operand {

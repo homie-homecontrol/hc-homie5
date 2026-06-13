@@ -1,9 +1,9 @@
+#[cfg(feature = "ext-meta")]
+use homie5::extensions::meta::{self, MetaMessage};
 use homie5::{
     DeviceRef, Homie5ControllerProtocol, Homie5Message, HomieDomain, HomieID, HomieValue,
     PropertyRef, ToTopic,
 };
-#[cfg(feature = "ext-meta")]
-use homie5::extensions::meta::{self, MetaMessage};
 use rumqttc::ClientError;
 use thiserror::Error;
 
@@ -67,7 +67,10 @@ impl HomieDiscovery {
         #[cfg(feature = "ext-meta")]
         {
             self.mqtt_client
-                .homie_unsubscribe(self.meta_client.unsubscribe_provider_discovery(homie_domain))
+                .homie_unsubscribe(
+                    self.meta_client
+                        .unsubscribe_provider_discovery(homie_domain),
+                )
                 .await?;
             self.mqtt_client
                 .homie_unsubscribe(self.meta_client.unsubscribe_all_overlays(homie_domain))

@@ -77,7 +77,9 @@ impl HomieMQTTClient {
         subs: impl Iterator<Item = Subscription> + Send,
     ) -> Result<(), rumqttc::ClientError> {
         for sub in subs {
-            self.client.subscribe(sub.topic, Self::map_qos(&sub.qos)).await?;
+            self.client
+                .subscribe(sub.topic, Self::map_qos(&sub.qos))
+                .await?;
         }
         Ok(())
     }

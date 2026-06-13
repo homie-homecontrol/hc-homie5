@@ -13,7 +13,7 @@ use crate::{
     store::DeviceStore,
 };
 
-use super::{HomieControllerClient, HomieDiscovery, DiscoveryError};
+use super::{DiscoveryError, HomieControllerClient, HomieDiscovery};
 
 #[derive(Clone)]
 pub struct DeviceManager {
@@ -30,14 +30,7 @@ impl DeviceManager {
     pub fn new(
         homie_domain: HomieDomain,
         homie_client_options: &MqttClientConfig,
-    ) -> Result<
-        (
-            Self,
-            HomieClientHandle,
-            mpsc::Receiver<HomieClientEvent>,
-        ),
-        HomieClientError,
-    > {
+    ) -> Result<(Self, HomieClientHandle, mpsc::Receiver<HomieClientEvent>), HomieClientError> {
         let (homie_client_handle, homie_mqtt_client, homie_event_receiver) = run_homie_client(
             homie_client_options.to_mqtt_options()?,
             homie_client_options.mqtt_channel_size,

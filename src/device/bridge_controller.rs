@@ -41,8 +41,12 @@ impl BridgeController {
         action_variants: &[&str],
     ) -> Self {
         let device_ref = DeviceRef::new(domain.clone(), controller_id.clone());
-        let (action_prop, device_desc) =
-            build_bridge_controller_description(&controller_id, controller_name, &domain, action_variants);
+        let (action_prop, device_desc) = build_bridge_controller_description(
+            &controller_id,
+            controller_name,
+            &domain,
+            action_variants,
+        );
 
         Self {
             device_ref,
@@ -66,8 +70,11 @@ impl BridgeController {
         action_prop: PropertyRef,
         mqtt_client: HomieMQTTClient,
     ) -> Self {
-        let homie_proto =
-            Homie5DeviceProtocol::new(device_ref.device_id().clone(), device_ref.homie_domain().clone()).0;
+        let homie_proto = Homie5DeviceProtocol::new(
+            device_ref.device_id().clone(),
+            device_ref.homie_domain().clone(),
+        )
+        .0;
         Self {
             device_ref,
             device_desc,
@@ -228,9 +235,10 @@ impl BridgeController {
         &self,
         info: &homie5::extensions::meta::MetaProviderInfo,
     ) -> Result<(), BridgeControllerError> {
-        let provider = self.meta_provider.as_ref().ok_or_else(|| {
-            BridgeControllerError::MetaProviderNotSet
-        })?;
+        let provider = self
+            .meta_provider
+            .as_ref()
+            .ok_or_else(|| BridgeControllerError::MetaProviderNotSet)?;
         let publish = provider.publish_provider_info(info)?;
         self.mqtt_client.homie_publish(publish).await?;
         Ok(())

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::client::{HomieClientHandle, HomieClientError, HomieMQTTClient};
+use crate::client::{HomieClientError, HomieClientHandle, HomieMQTTClient};
 
 use super::HomieDevice;
 

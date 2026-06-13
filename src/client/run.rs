@@ -1,15 +1,17 @@
 use std::time::Duration;
 
-use homie5::parse_mqtt_message;
 #[cfg(feature = "ext-meta")]
 use homie5::extensions::meta::parse_meta_message;
+use homie5::parse_mqtt_message;
 use rumqttc::{AsyncClient, MqttOptions};
 use tokio::sync::{
     mpsc::{self, Receiver},
     watch,
 };
 
-use super::{HomieClientError, HomieClientEvent, HomieClientHandle, HomieMQTTClient, PendingPublishTracker};
+use super::{
+    HomieClientError, HomieClientEvent, HomieClientHandle, HomieMQTTClient, PendingPublishTracker,
+};
 
 pub fn run_homie_client(
     mqttoptions: MqttOptions,
@@ -72,7 +74,9 @@ pub fn run_homie_client_with_options(
                                 {
                                     match parse_meta_message(&p.topic, &p.payload) {
                                         Ok(Some(meta_msg)) => {
-                                            sender.send(HomieClientEvent::MetaMessage(meta_msg)).await?;
+                                            sender
+                                                .send(HomieClientEvent::MetaMessage(meta_msg))
+                                                .await?;
                                         }
                                         Ok(None) => {
                                             log::error!(
