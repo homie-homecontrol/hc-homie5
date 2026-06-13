@@ -32,7 +32,7 @@ regex = { version = "1.12" }
 chrono = { version = "0.4", features = ["serde"] }
 schemars = "1.2"
 homie5 = { version = "0.11" }
-hc-homie5-smarthome = { version = "0.6" }
+hc-homie5-smarthome = { version = "0.7" }
 
 [dev-dependencies]
 serde_yaml_ng = "0.10"
