@@ -66,7 +66,7 @@ property:
                     .build(),
             )
             .build();
-        let query: QueryDefinition = serde_yml::from_str(yaml).unwrap();
+        let query: QueryDefinition = serde_yaml_ng::from_str(yaml).unwrap();
         let refs: Vec<PropertyRef> = query.match_query(
             &HomieDomain::Default,
             &HomieID::new_const("device-1"),
@@ -101,7 +101,7 @@ children:
       - ["child1", "child2"]
       - ["child3"]
 "#;
-        let query: DeviceQuery = serde_yml::from_str(yaml).unwrap();
+        let query: DeviceQuery = serde_yaml_ng::from_str(yaml).unwrap();
         let children = vec!["child1".try_into().unwrap(), "child4".try_into().unwrap()];
         assert!(query.children.as_ref().unwrap().evaluate(&children));
 
@@ -117,7 +117,7 @@ children:
     value:
       - ["child1", "child2", "child3"]
 "#;
-        let query: DeviceQuery = serde_yml::from_str(yaml).unwrap();
+        let query: DeviceQuery = serde_yaml_ng::from_str(yaml).unwrap();
         let children = vec![
             "child1".try_into().unwrap(),
             "child2".try_into().unwrap(),
@@ -138,7 +138,7 @@ extensions:
       - "deprecated"
       - "legacy"
 "#;
-        let query: DeviceQuery = serde_yml::from_str(yaml).unwrap();
+        let query: DeviceQuery = serde_yaml_ng::from_str(yaml).unwrap();
         let extensions = vec!["mqtt".to_string(), "homie5".to_string()];
         assert!(query.extensions.as_ref().unwrap().evaluate(&extensions));
 
@@ -192,7 +192,7 @@ node:
 property:
   name: "temperature"
 "#;
-        let query: QueryDefinition = serde_yml::from_str(yaml).unwrap();
+        let query: QueryDefinition = serde_yaml_ng::from_str(yaml).unwrap();
 
         // Build a device description with one node that has two properties.
         // One property has the name "temperature" and the other "humidity".

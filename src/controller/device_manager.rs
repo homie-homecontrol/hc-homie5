@@ -1,10 +1,14 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use homie5::{Homie5ControllerProtocol, Homie5Message, HomieDomain, HomieValue, PropertyRef};
 use tokio::sync::{mpsc, RwLock};
 
 use crate::{
-    client::{run_homie_client, HomieClientError, HomieClientEvent, HomieClientHandle, MqttClientConfig},
+    client::{
+        run_homie_client, FlushTimeout, HomieClientError, HomieClientEvent, HomieClientHandle,
+        MqttClientConfig, PendingPublishObserver,
+    },
     model::DiscoveryAction,
     store::DeviceStore,
 };
@@ -17,6 +21,9 @@ pub struct DeviceManager {
     ctrl_client: HomieControllerClient,
     discovery: HomieDiscovery,
     homie_domain: HomieDomain,
+    /// Observes queued plus in-flight publishes of the underlying homie
+    /// client connection (see [`DeviceManager::flush`]).
+    pending_publishes: PendingPublishObserver,
 }
 
 impl DeviceManager {
@@ -40,6 +47,7 @@ impl DeviceManager {
         let discovery = HomieDiscovery::new(homie_mqtt_client.clone());
         let ctrl_client =
             HomieControllerClient::new(Homie5ControllerProtocol::new(), homie_mqtt_client);
+        let pending_publishes = homie_client_handle.pending_publishes();
 
         Ok((
             Self {
@@ -47,6 +55,7 @@ impl DeviceManager {
                 discovery,
                 ctrl_client,
                 homie_domain,
+                pending_publishes,
             },
             homie_client_handle,
             homie_event_receiver,
@@ -83,6 +92,17 @@ impl DeviceManager {
     pub async fn disconnect_client(&self) -> Result<(), rumqttc::ClientError> {
         self.ctrl_client.homie_client().disconnect().await?;
         Ok(())
+    }
+
+    /// Waits until all in-flight QoS>0 publishes of this manager's client
+    /// connection have been acknowledged by the broker.
+    ///
+    /// Returns immediately when nothing is pending; `max_wait` is only an
+    /// upper bound for the dead-broker case. Call this before
+    /// [`disconnect_client`](Self::disconnect_client) to guarantee final
+    /// messages reached the broker.
+    pub async fn flush(&self, max_wait: Duration) -> Result<(), FlushTimeout> {
+        self.pending_publishes.flushed(max_wait).await
     }
 
     pub async fn read(&self) -> tokio::sync::RwLockReadGuard<'_, DeviceStore> {

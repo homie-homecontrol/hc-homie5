@@ -3,26 +3,41 @@ use std::ops::{Deref, DerefMut};
 use homie5::client::{Publish, Subscription, Unsubscribe};
 use rumqttc::AsyncClient;
 
+use super::QueuedPublishCounter;
+
+/// Wrapper around [`rumqttc::AsyncClient`] that counts every publish it
+/// enqueues so [`HomieClientHandle::flush`](super::HomieClientHandle::flush)
+/// can wait for requests the event loop has not even seen yet.
+///
+/// Publishes issued through the [`Deref`] escape hatch bypass the queued
+/// counting (they are still flush-tracked from the moment the event loop
+/// emits `Outgoing::Publish`); prefer [`homie_publish`](Self::homie_publish).
 #[derive(Debug, Clone)]
-pub struct HomieMQTTClient(AsyncClient);
+pub struct HomieMQTTClient {
+    client: AsyncClient,
+    queued_publishes: QueuedPublishCounter,
+}
 
 impl Deref for HomieMQTTClient {
     type Target = AsyncClient;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.client
     }
 }
 
 impl DerefMut for HomieMQTTClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.client
     }
 }
 
 impl HomieMQTTClient {
-    pub fn new(mqtt_client: AsyncClient) -> Self {
-        Self(mqtt_client)
+    pub fn new(mqtt_client: AsyncClient, queued_publishes: QueuedPublishCounter) -> Self {
+        Self {
+            client: mqtt_client,
+            queued_publishes,
+        }
     }
 
     pub fn map_qos(qos: &homie5::client::QoS) -> rumqttc::QoS {
@@ -42,9 +57,17 @@ impl HomieMQTTClient {
     }
     // Implementation for publishing messages
     pub async fn homie_publish(&self, p: Publish) -> Result<(), rumqttc::ClientError> {
-        self.0
+        // Count before enqueueing so the event loop can never observe the
+        // request ahead of the counter increment.
+        self.queued_publishes.increment();
+        if let Err(err) = self
+            .client
             .publish(p.topic, Self::map_qos(&p.qos), p.retain, p.payload)
-            .await?;
+            .await
+        {
+            self.queued_publishes.decrement();
+            return Err(err);
+        }
         Ok(())
     }
 
@@ -54,7 +77,7 @@ impl HomieMQTTClient {
         subs: impl Iterator<Item = Subscription> + Send,
     ) -> Result<(), rumqttc::ClientError> {
         for sub in subs {
-            self.0.subscribe(sub.topic, Self::map_qos(&sub.qos)).await?;
+            self.client.subscribe(sub.topic, Self::map_qos(&sub.qos)).await?;
         }
         Ok(())
     }
@@ -65,7 +88,7 @@ impl HomieMQTTClient {
         subs: impl Iterator<Item = Unsubscribe> + Send,
     ) -> Result<(), rumqttc::ClientError> {
         for sub in subs {
-            self.0.unsubscribe(sub.topic).await?;
+            self.client.unsubscribe(sub.topic).await?;
         }
         Ok(())
     }

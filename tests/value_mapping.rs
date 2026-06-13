@@ -102,7 +102,7 @@ mod tests {
 
         // When the input ("hello") satisfies the mapping condition, we should get "world".
         let vm = "hello".to_string();
-        let result_match = mapping_io.map_ouput(&vm);
+        let result_match = mapping_io.map_output(&vm);
         assert!(result_match.is_mapped());
         if let MappingResult::Mapped(mapped) = result_match {
             assert_eq!(mapped, "world");
@@ -110,7 +110,7 @@ mod tests {
 
         // For a non-matching value, we expect an unmapped result.
         let vm = "not hello".to_string();
-        let result_no_match = mapping_io.map_ouput(&vm);
+        let result_no_match = mapping_io.map_output(&vm);
         assert!(!result_no_match.is_mapped());
         if let MappingResult::Unmapped(unmapped) = result_no_match {
             assert_eq!(unmapped, "not hello");
