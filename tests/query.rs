@@ -209,9 +209,7 @@ property:
                     )
                     .add_property(
                         HomieID::new_const("humidity"),
-                        PropertyDescriptionBuilder::float()
-                            .name("humidity")
-                            .build(),
+                        PropertyDescriptionBuilder::float().name("humidity").build(),
                     )
                     .build(),
             )

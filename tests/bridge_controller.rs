@@ -66,12 +66,8 @@ mod tests {
     fn test_bridge_controller_description_structure() {
         let controller_id: HomieID = "test-ctrl".try_into().unwrap();
         let domain: HomieDomain = "homie".try_into().unwrap();
-        let (action_prop, desc) = build_bridge_controller_description(
-            &controller_id,
-            "Test",
-            &domain,
-            &["refresh"],
-        );
+        let (action_prop, desc) =
+            build_bridge_controller_description(&controller_id, "Test", &domain, &["refresh"]);
 
         // Verify the description has expected structure
         assert_eq!(desc.children.len(), 0);

@@ -1,10 +1,10 @@
 // ── base modules (WASM-safe) ─────────────────────────
-pub mod model;
-pub mod store;
-pub mod query;
-pub mod value;
 pub mod connection;
+pub mod model;
+pub mod query;
+pub mod store;
 pub mod util;
+pub mod value;
 
 // ── alerts: engine is base, publisher is framework ────
 pub mod alerts;
@@ -13,9 +13,9 @@ pub mod alerts;
 #[cfg(feature = "framework")]
 pub mod client;
 #[cfg(feature = "framework")]
-pub mod device;
-#[cfg(feature = "framework")]
 pub mod controller;
+#[cfg(feature = "framework")]
+pub mod device;
 #[cfg(feature = "framework")]
 pub mod settings;
 

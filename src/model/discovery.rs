@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use homie5::{DeviceRef, Homie5Message, HomieDeviceStatus, HomieID, HomieValue, PropertyRef};
 #[cfg(feature = "ext-meta")]
 use homie5::HomieDomain;
+use homie5::{DeviceRef, Homie5Message, HomieDeviceStatus, HomieID, HomieValue, PropertyRef};
 
 use super::Device;
 

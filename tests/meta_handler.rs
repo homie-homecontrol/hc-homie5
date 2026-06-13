@@ -50,7 +50,9 @@ mod tests {
 
         // Overlay should be applied directly to device
         let device = store.get_device(&dref).unwrap();
-        assert!(device.meta_overlays.contains_key(&provider_id("provider-1")));
+        assert!(device
+            .meta_overlays
+            .contains_key(&provider_id("provider-1")));
     }
 
     #[test]
@@ -79,7 +81,9 @@ mod tests {
 
         // Overlay should now be on the device
         let device = store.get_device(&dref).unwrap();
-        assert!(device.meta_overlays.contains_key(&provider_id("provider-1")));
+        assert!(device
+            .meta_overlays
+            .contains_key(&provider_id("provider-1")));
     }
 
     #[test]
@@ -110,8 +114,16 @@ mod tests {
         handler.handle_meta_message(msg2, &mut store);
 
         // Both devices should have overlays
-        assert!(store.get_device(&dref1).unwrap().meta_overlays.contains_key(&provider_id("provider-1")));
-        assert!(store.get_device(&dref2).unwrap().meta_overlays.contains_key(&provider_id("provider-1")));
+        assert!(store
+            .get_device(&dref1)
+            .unwrap()
+            .meta_overlays
+            .contains_key(&provider_id("provider-1")));
+        assert!(store
+            .get_device(&dref2)
+            .unwrap()
+            .meta_overlays
+            .contains_key(&provider_id("provider-1")));
 
         // Remove provider
         let msg = MetaMessage::ProviderRemoval {
@@ -141,7 +153,11 @@ mod tests {
             overlay: test_overlay(),
         };
         handler.handle_meta_message(msg, &mut store);
-        assert!(store.get_device(&dref).unwrap().meta_overlays.contains_key(&provider_id("provider-1")));
+        assert!(store
+            .get_device(&dref)
+            .unwrap()
+            .meta_overlays
+            .contains_key(&provider_id("provider-1")));
 
         // Remove overlay
         let msg = MetaMessage::DeviceOverlayRemoval {
@@ -243,6 +259,8 @@ mod tests {
 
         let device = store.get_device(&dref).unwrap();
         assert_eq!(device.meta_overlays.len(), 1);
-        assert!(device.meta_overlays.contains_key(&provider_id("provider-2")));
+        assert!(device
+            .meta_overlays
+            .contains_key(&provider_id("provider-2")));
     }
 }

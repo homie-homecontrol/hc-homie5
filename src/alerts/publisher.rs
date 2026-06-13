@@ -45,7 +45,9 @@ impl DeviceAlertPublisher {
         mode: ReconcileMode,
         observed: impl IntoIterator<Item = AlertObservation<'a>>,
     ) -> Result<AlertApplyStats, rumqttc::ClientError> {
-        let stats = self.engine.apply_cycle(mode, observed, &mut self.scratch_ops);
+        let stats = self
+            .engine
+            .apply_cycle(mode, observed, &mut self.scratch_ops);
 
         for op in &self.scratch_ops {
             self.publish_op(op).await?;
@@ -58,7 +60,8 @@ impl DeviceAlertPublisher {
         &mut self,
         observed: impl IntoIterator<Item = AlertObservation<'a>>,
     ) -> Result<AlertApplyStats, rumqttc::ClientError> {
-        self.apply_cycle(ReconcileMode::FullSnapshot, observed).await
+        self.apply_cycle(ReconcileMode::FullSnapshot, observed)
+            .await
     }
 
     pub fn engine_mut(&mut self) -> &mut AlertEngine {

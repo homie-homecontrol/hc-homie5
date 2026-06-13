@@ -5,10 +5,7 @@ use homie5::client::LastWill;
 use rand::{distr::Alphanumeric, rng, RngExt};
 use rumqttc::{ClientError, MqttOptions, Transport};
 use thiserror::Error;
-use tokio::{
-    sync::mpsc::error::SendError,
-    task::JoinError,
-};
+use tokio::{sync::mpsc::error::SendError, task::JoinError};
 
 use super::{HomieClientEvent, HomieMQTTClient};
 
