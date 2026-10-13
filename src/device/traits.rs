@@ -128,6 +128,10 @@ where
         }
     }
 
+    /// Removes the device from the broker by clearing its retained topics.
+    ///
+    /// Active alerts are not cleared because the device protocol does not know their IDs; clear
+    /// them first, e.g. with `DeviceAlertPublisher::clear_all`.
     fn unpublish_device(
         &self,
     ) -> impl std::future::Future<Output = Result<(), Self::ResultError>> + Send {

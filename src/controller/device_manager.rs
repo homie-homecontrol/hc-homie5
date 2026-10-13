@@ -73,12 +73,29 @@ impl DeviceManager {
         self.discovery.handle_event(message, &mut devices).await
     }
 
+    /// Sends a set command, using the QoS recommended for the property if its description is
+    /// known (QoS 0 for non-retained properties) and QoS 2 otherwise.
     pub async fn set_command(
         &self,
         target: &PropertyRef,
         value: &HomieValue,
     ) -> Result<(), rumqttc::ClientError> {
-        self.ctrl_client.set_command(target, value).await?;
+        let prop_desc = {
+            let devices = self.devices.read().await;
+            devices
+                .get_device(target.device_ref())
+                .and_then(|device| device.description.as_ref())
+                .and_then(|desc| desc.get_property(target.prop_pointer()))
+                .cloned()
+        };
+        match prop_desc {
+            Some(prop_desc) => {
+                self.ctrl_client
+                    .set_command_for_property(target, &prop_desc, value)
+                    .await?
+            }
+            None => self.ctrl_client.set_command(target, value).await?,
+        }
         Ok(())
     }
 
