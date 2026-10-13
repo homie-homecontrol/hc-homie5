@@ -1,8 +1,8 @@
 #[cfg(feature = "ext-meta")]
 use homie5::extensions::meta::{self, MetaMessage};
 use homie5::{
-    DeviceRef, Homie5ControllerProtocol, Homie5Message, HomieDomain, HomieID, HomieValue,
-    PropertyRef, ToTopic,
+    device_description::HomieDeviceDescription, DeviceRef, Homie5ControllerProtocol, Homie5Message,
+    HomieDomain, HomieID, HomieValue, PropertyRef, ToTopic,
 };
 use rumqttc::ClientError;
 use thiserror::Error;
@@ -103,46 +103,34 @@ impl HomieDiscovery {
             Homie5Message::DeviceDescription {
                 device,
                 description,
-            } => match devices.store_description(&device, description) {
-                DescriptionUpdate::Update {
-                    device: device_ref,
-                    from,
-                    to,
-                } => {
-                    if let Some(from) = from {
-                        if from.version == to.version {
-                            return Ok(None);
-                        }
-                        self.mqtt_client
-                            .homie_unsubscribe(self.client.unsubscribe_props(device_ref, &from))
-                            .await?;
-                    }
-
-                    self.mqtt_client
-                        .homie_subscribe(self.client.subscribe_props(device_ref, to))
-                        .await?;
-                    Some(DiscoveryAction::DeviceDescriptionChanged(device))
+                issues,
+            } => {
+                for issue in &issues {
+                    log::warn!("[{}] invalid description: {}", device.to_topic(), issue);
                 }
-                DescriptionUpdate::NoChange => None,
-                DescriptionUpdate::NotFound => {
-                    log::warn!(
-                        "Warning, description update received for non discovered device [{}]",
-                        device.to_topic()
-                    );
-                    return Err(DiscoveryError::DescriptionForNonExistingDevice(device));
-                }
-            },
+                self.handle_description(device, description, devices)
+                    .await?
+            }
+            // Sent as part of a device removal, which is handled on the empty `$state`.
+            Homie5Message::DeviceDescriptionCleared { .. } => None,
             Homie5Message::PropertyValue { property, value } => {
                 self.update_prop_value(property, value, devices)
             }
             Homie5Message::PropertyTarget { property, target } => {
                 self.update_prop_target(property, target, devices)
             }
+            // Retained values are only deleted when properties or devices are removed; the
+            // store follows the device description, so there is nothing to update here.
+            Homie5Message::PropertyValueCleared { .. }
+            | Homie5Message::PropertyTargetCleared { .. } => None,
             Homie5Message::DeviceAlert {
                 device,
                 alert_id,
                 alert_msg,
             } => self.store_alert(device, alert_id, alert_msg, devices),
+            Homie5Message::DeviceAlertCleared { device, alert_id } => {
+                self.clear_alert(device, alert_id, devices)
+            }
             Homie5Message::DeviceRemoval { device } => {
                 self.mqtt_client
                     .homie_unsubscribe(self.client.unsubscribe_device(&device))
@@ -164,6 +152,45 @@ impl HomieDiscovery {
                 Some(DiscoveryAction::DeviceRemoved(dev))
             }
             _ => Some(DiscoveryAction::Unhandled(event)),
+        };
+
+        Ok(action)
+    }
+
+    async fn handle_description(
+        &self,
+        device: DeviceRef,
+        description: HomieDeviceDescription,
+        devices: &mut DeviceStore,
+    ) -> Result<Option<DiscoveryAction>, DiscoveryError> {
+        let action = match devices.store_description(&device, description) {
+            DescriptionUpdate::Update {
+                device: device_ref,
+                from,
+                to,
+            } => {
+                if let Some(from) = from {
+                    if from.version == to.version {
+                        return Ok(None);
+                    }
+                    self.mqtt_client
+                        .homie_unsubscribe(self.client.unsubscribe_props(device_ref, &from))
+                        .await?;
+                }
+
+                self.mqtt_client
+                    .homie_subscribe(self.client.subscribe_props(device_ref, to))
+                    .await?;
+                Some(DiscoveryAction::DeviceDescriptionChanged(device))
+            }
+            DescriptionUpdate::NoChange => None,
+            DescriptionUpdate::NotFound => {
+                log::warn!(
+                    "Warning, description update received for non discovered device [{}]",
+                    device.to_topic()
+                );
+                return Err(DiscoveryError::DescriptionForNonExistingDevice(device));
+            }
         };
 
         Ok(action)
@@ -320,6 +347,22 @@ impl HomieDiscovery {
                 device: device_ref,
                 alert_id: id,
             }),
+        }
+    }
+
+    fn clear_alert(
+        &self,
+        device_ref: DeviceRef,
+        id: HomieID,
+        devices: &mut DeviceStore,
+    ) -> Option<DiscoveryAction> {
+        let device = devices.get_device_mut(&device_ref)?;
+        match device.alerts.clear_alert(id) {
+            AlertUpdate::Cleared { id } => Some(DiscoveryAction::DeviceAlertCleared {
+                device: device_ref,
+                alert_id: id,
+            }),
+            _ => None,
         }
     }
 }

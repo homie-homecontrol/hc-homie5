@@ -44,14 +44,9 @@ impl AlertStore {
         Self(HashMap::new())
     }
 
+    /// Stores an active alert. An empty `alert` is a valid alert text, not a removal; use
+    /// [`AlertStore::clear_alert`] for cleared alerts.
     pub fn store_alert(&mut self, id: HomieID, alert: String) -> AlertUpdate {
-        if alert.is_empty() {
-            if self.0.remove(&id).is_some() {
-                return AlertUpdate::Cleared { id };
-            } else {
-                return AlertUpdate::NoChange;
-            }
-        }
         if let Some(entry) = self.0.get_mut(&id) {
             if *entry != alert {
                 let old = entry.clone();
@@ -70,7 +65,39 @@ impl AlertStore {
         }
     }
 
+    /// Removes a cleared alert.
+    pub fn clear_alert(&mut self, id: HomieID) -> AlertUpdate {
+        if self.0.remove(&id).is_some() {
+            AlertUpdate::Cleared { id }
+        } else {
+            AlertUpdate::NoChange
+        }
+    }
+
     pub fn as_map(&self) -> &HashMap<HomieID, String> {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_alert_text_is_stored_and_clear_removes_it() {
+        let id = HomieID::new_const("battery");
+        let mut store = AlertStore::new();
+
+        assert!(matches!(
+            store.store_alert(id.clone(), String::new()),
+            AlertUpdate::New { .. }
+        ));
+        assert_eq!(store.get(&id).map(String::as_str), Some(""));
+
+        assert!(matches!(
+            store.clear_alert(id.clone()),
+            AlertUpdate::Cleared { .. }
+        ));
+        assert!(matches!(store.clear_alert(id), AlertUpdate::NoChange));
     }
 }

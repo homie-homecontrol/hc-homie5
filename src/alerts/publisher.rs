@@ -64,6 +64,15 @@ impl DeviceAlertPublisher {
             .await
     }
 
+    /// Clears every alert of the device that is not known to be inactive.
+    ///
+    /// Call this before removing a device with `HomieDevice::unpublish_device`, which cannot
+    /// know the device's alert IDs.
+    pub async fn clear_all(&mut self) -> Result<AlertApplyStats, rumqttc::ClientError> {
+        self.apply_cycle(ReconcileMode::FullSnapshot, std::iter::empty())
+            .await
+    }
+
     pub fn engine_mut(&mut self) -> &mut AlertEngine {
         &mut self.engine
     }
