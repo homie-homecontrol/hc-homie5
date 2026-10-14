@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+use hc_homie5_smarthome::PropSpec;
 use homie5::device_description::{
     DeviceDescriptionBuilder, HomieDeviceDescription, NodeDescriptionBuilder,
     PropertyDescriptionBuilder,
@@ -294,6 +295,13 @@ impl BridgeController {
     }
 }
 
+/// The `action` property of the bridge controller's `control` node.
+pub const BRIDGE_CONTROLLER_ACTION_PROP: PropSpec = PropSpec {
+    id: HomieID::new_const("action"),
+    retained: false,
+    settable: true,
+};
+
 /// Build a standard bridge controller description with a `control` node
 /// and `action` enum property.
 pub fn build_bridge_controller_description(
@@ -307,7 +315,7 @@ pub fn build_bridge_controller_description(
         controller_id.clone(),
         "control".try_into().unwrap(),
     );
-    let prop = PropertyRef::from_node(node.clone(), "action".try_into().unwrap());
+    let prop = PropertyRef::from_node(node.clone(), BRIDGE_CONTROLLER_ACTION_PROP.id);
     let desc = DeviceDescriptionBuilder::new()
         .name(controller_name)
         .add_node(
@@ -319,8 +327,8 @@ pub fn build_bridge_controller_description(
                     PropertyDescriptionBuilder::enumeration(action_variants.iter().copied())
                         .unwrap()
                         .name("Request action from controller")
-                        .retained(false)
-                        .settable(true)
+                        .retained(BRIDGE_CONTROLLER_ACTION_PROP.retained)
+                        .settable(BRIDGE_CONTROLLER_ACTION_PROP.settable)
                         .build(),
                 )
                 .build(),
