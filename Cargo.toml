@@ -1,6 +1,6 @@
 [package]
 name = "hc-homie5"
-version = "0.10.1"
+version = "0.11.0"
 edition = "2021"
 publish = true
 description = "Provides higher level function implementation for homie5 homie devices (discovery and device implementation)."
@@ -32,7 +32,7 @@ regex = { version = "1.12" }
 chrono = { version = "0.4", features = ["serde"] }
 schemars = "1.2"
 homie5 = { version = "0.12", features = ["schemars"] }
-hc-homie5-smarthome = { version = "0.9" }
+hc-homie5-smarthome = { version = "0.10" }
 
 [dev-dependencies]
 serde_yaml_ng = "0.10"
