@@ -162,7 +162,7 @@ hc_homie5::logging::init(hc_homie5::log_config!("HC_MYBRIDGE"))?;
 Every line carries the target and `file:line`. `init` also installs a panic hook that logs the
 panic as one ERROR event and exits with code 1 (`LogConfig::exit_on_panic(false)` keeps the
 process running). `logging::Outage` logs a recurring failure once when it starts and once when it
-ends; `logging::truncate` and `logging::chain` format large payloads and error chains for fields.
+ends; `logging::truncate` and `logging::chain` turn large payloads and error chains into one-line field values.
 
 ## Typical architecture
 

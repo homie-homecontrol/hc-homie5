@@ -253,7 +253,7 @@ impl HomieDiscovery {
             Err(err) => {
                 tracing::debug!(
                     topic = %property.to_topic(),
-                    value = %truncate(&value, PAYLOAD_MAX),
+                    value = truncate(&value, PAYLOAD_MAX),
                     error = %err,
                     "invalid property value ignored"
                 );
@@ -305,7 +305,7 @@ impl HomieDiscovery {
             Err(err) => {
                 tracing::debug!(
                     topic = %property.to_topic(),
-                    target = %truncate(&target, PAYLOAD_MAX),
+                    target = truncate(&target, PAYLOAD_MAX),
                     error = %err,
                     "invalid property target ignored"
                 );

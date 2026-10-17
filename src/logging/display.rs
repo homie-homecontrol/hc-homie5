@@ -1,56 +1,35 @@
-use std::fmt;
-
-/// Display adapter that cuts a string at a UTF-8 boundary after at most `max_bytes` bytes.
+/// Cuts a string at a UTF-8 boundary after at most `max_bytes` bytes and appends the omitted
+/// size as `…(+N bytes)`.
 ///
-/// The omitted size is appended as `…(+N bytes)`.
-pub fn truncate(value: &str, max_bytes: usize) -> Truncated<'_> {
-    Truncated { value, max_bytes }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Truncated<'a> {
-    value: &'a str,
-    max_bytes: usize,
-}
-
-impl fmt::Display for Truncated<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.value.len() <= self.max_bytes {
-            return f.write_str(self.value);
-        }
-        let mut end = self.max_bytes;
-        while !self.value.is_char_boundary(end) {
-            end -= 1;
-        }
-        write!(
-            f,
-            "{}…(+{} bytes)",
-            &self.value[..end],
-            self.value.len() - end
-        )
+/// Recorded as a plain field (`payload = truncate(&body, PAYLOAD_MAX)`), the text is quoted and
+/// newlines are escaped.
+pub fn truncate(value: &str, max_bytes: usize) -> String {
+    if value.len() <= max_bytes {
+        return value.to_owned();
     }
-}
-
-/// Display adapter that renders an error and all its sources on one line: `outer: inner: root`.
-pub fn chain<'a>(err: &'a (dyn std::error::Error + 'static)) -> ErrorChain<'a> {
-    ErrorChain { err }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ErrorChain<'a> {
-    err: &'a (dyn std::error::Error + 'static),
-}
-
-impl fmt::Display for ErrorChain<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.err)?;
-        let mut source = self.err.source();
-        while let Some(err) = source {
-            write!(f, ": {err}")?;
-            source = err.source();
-        }
-        Ok(())
+    let mut end = max_bytes;
+    while !value.is_char_boundary(end) {
+        end -= 1;
     }
+    format!("{}…(+{} bytes)", &value[..end], value.len() - end)
+}
+
+/// Renders an error and all its sources on one line: `outer: inner: root`.
+///
+/// A source whose message is already part of the text (an error that embeds its source in its
+/// own message) is not repeated.
+pub fn chain(err: &(dyn std::error::Error + 'static)) -> String {
+    let mut text = err.to_string();
+    let mut source = err.source();
+    while let Some(err) = source {
+        let part = err.to_string();
+        if !text.contains(&part) {
+            text.push_str(": ");
+            text.push_str(&part);
+        }
+        source = err.source();
+    }
+    text
 }
 
 #[cfg(test)]
@@ -59,15 +38,15 @@ mod tests {
 
     #[test]
     fn truncate_keeps_short_values() {
-        assert_eq!(truncate("abc", 3).to_string(), "abc");
-        assert_eq!(truncate("", 0).to_string(), "");
+        assert_eq!(truncate("abc", 3), "abc");
+        assert_eq!(truncate("", 0), "");
     }
 
     #[test]
     fn truncate_cuts_at_char_boundary() {
-        assert_eq!(truncate("abcdef", 4).to_string(), "abcd…(+2 bytes)");
+        assert_eq!(truncate("abcdef", 4), "abcd…(+2 bytes)");
         // "ä" is two bytes; a cut inside it moves back to the boundary.
-        assert_eq!(truncate("aäb", 2).to_string(), "a…(+3 bytes)");
+        assert_eq!(truncate("aäb", 2), "a…(+3 bytes)");
     }
 
     #[derive(Debug, thiserror::Error)]
@@ -81,6 +60,16 @@ mod tests {
     #[test]
     fn chain_joins_all_sources() {
         let err = Outer(Inner(std::io::Error::other("root cause")));
-        assert_eq!(chain(&err).to_string(), "outer: inner: root cause");
+        assert_eq!(chain(&err), "outer: inner: root cause");
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("request failed: {0}")]
+    struct Embedding(#[source] Inner);
+
+    #[test]
+    fn chain_skips_sources_already_in_the_message() {
+        let err = Embedding(Inner(std::io::Error::other("root cause")));
+        assert_eq!(chain(&err), "request failed: inner: root cause");
     }
 }

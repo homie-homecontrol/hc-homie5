@@ -83,7 +83,7 @@ pub fn run_homie_client_with_options(
                                         Ok(None) => {
                                             tracing::warn!(
                                                 topic = %p.topic,
-                                                payload = %truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
+                                                payload = truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
                                                 error = %homie_err,
                                                 "unparsable MQTT message ignored"
                                             );
@@ -91,7 +91,7 @@ pub fn run_homie_client_with_options(
                                         Err(meta_err) => {
                                             tracing::warn!(
                                                 topic = %p.topic,
-                                                payload = %truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
+                                                payload = truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
                                                 error = %homie_err,
                                                 meta_error = %meta_err,
                                                 "unparsable MQTT message ignored"
@@ -103,7 +103,7 @@ pub fn run_homie_client_with_options(
                                 {
                                     tracing::warn!(
                                         topic = %p.topic,
-                                        payload = %truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
+                                        payload = truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
                                         error = %homie_err,
                                         "unparsable MQTT message ignored"
                                     );
