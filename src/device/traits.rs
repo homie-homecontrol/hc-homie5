@@ -87,7 +87,7 @@ where
         &mut self,
     ) -> impl std::future::Future<Output = Result<(), Self::ResultError>> + Send {
         async {
-            log::debug!("[{}/{}] publishing", self.homie_domain(), self.homie_id());
+            tracing::debug!(domain = %self.homie_domain(), device = %self.homie_id(), "publishing device");
 
             let steps = homie_device_publish_steps();
 
@@ -149,7 +149,7 @@ where
         &mut self,
     ) -> impl std::future::Future<Output = Result<(), Self::ResultError>> + Send {
         async {
-            log::debug!("[{}] disconnect", self.homie_proto().id());
+            tracing::debug!(device = %self.homie_proto().id(), "disconnecting device");
             for step in homie_device_disconnect_steps() {
                 match step {
                     homie5::DeviceDisconnectStep::DeviceStateDisconnect => {

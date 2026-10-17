@@ -37,11 +37,7 @@ impl MetaOverlayHandler {
                 if homie_domain != self.homie_domain {
                     return false;
                 }
-                log::debug!(
-                    "Meta provider discovered: {} (schema={})",
-                    provider_id,
-                    info.schema
-                );
+                tracing::debug!(provider = %provider_id, schema = %info.schema, "meta provider discovered");
                 true
             }
             MetaMessage::ProviderRemoval {
@@ -52,7 +48,7 @@ impl MetaOverlayHandler {
                     return false;
                 }
                 self.remove_provider(&provider_id, devices);
-                log::debug!("Meta provider removed: {}", provider_id);
+                tracing::debug!(provider = %provider_id, "meta provider removed");
                 true
             }
             MetaMessage::DeviceOverlay {
@@ -100,10 +96,10 @@ impl MetaOverlayHandler {
 
         if let Some(device) = devices.get_device_mut(device_ref) {
             for (provider_id, overlay) in overlays_to_apply {
-                log::trace!(
-                    "Applying pending meta overlay: provider={} device={}",
-                    provider_id,
-                    device_ref.device_id()
+                tracing::trace!(
+                    provider = %provider_id,
+                    device = %device_ref.device_id(),
+                    "applying pending meta overlay"
                 );
                 device.meta_overlays.insert(provider_id, overlay);
             }

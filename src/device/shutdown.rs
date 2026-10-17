@@ -23,6 +23,7 @@ where
         + From<rumqttc::ClientError>
         + Send
         + Sync
+        + std::fmt::Display
         + std::fmt::Debug,
 {
     for device in devices {
@@ -40,14 +41,14 @@ where
         .stop()
         .await
         .map_err(GracefulShutdownError::MqttClient)?;
-    log::info!("Disconnected from MQTT");
+    tracing::debug!("disconnected from MQTT");
     Ok(())
 }
 
 /// Errors from graceful bridge shutdown.
 #[derive(Debug, thiserror::Error)]
-pub enum GracefulShutdownError<E: std::fmt::Debug> {
-    #[error("Device disconnect error: {0:?}")]
+pub enum GracefulShutdownError<E: std::fmt::Display + std::fmt::Debug> {
+    #[error("Device disconnect error: {0:#}")]
     Device(E),
     #[error("MQTT client error: {0}")]
     MqttClient(HomieClientError),
