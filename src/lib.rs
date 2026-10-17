@@ -1,5 +1,6 @@
 // ── base modules (WASM-safe) ─────────────────────────
 pub mod connection;
+pub mod logging;
 pub mod model;
 pub mod query;
 pub mod store;
@@ -31,3 +32,8 @@ pub use hc_homie5_macros::homie_device_enum;
 
 // paste re-export (used by event_multiplexer macro)
 pub use paste;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use tracing;
+}

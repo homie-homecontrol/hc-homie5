@@ -30,6 +30,7 @@ The public API is organized into domain-oriented submodules:
 | `device` | framework | `HomieDeviceCore`, `HomieDevice` traits — device-side building blocks |
 | `controller` | framework | `DeviceManager`, `HomieDiscovery`, `HomieControllerClient` — controller-side |
 | `settings` | framework | `HomieSettings` — env-driven configuration |
+| `logging` | base / logging | `truncate`, `chain` (base); `init`, `LogConfig`, `Outage` (logging) — shared service logging |
 
 Async utilities (`DebouncedSender`, `DelayedSender`) and the `define_event_multiplexer!` macro require the `tokio` feature.
 
@@ -42,12 +43,13 @@ Default features: `base`, `macros`, `framework`, `tokio`.
 - `framework`: MQTT client integration (`rumqttc`), discovery, settings, device/controller traits
 - `tokio`: async utilities (`DebouncedSender`, `DelayedSender`) and signal handling
 - `ext-meta`: enables Homie meta extension integration (forwarded from `homie5/ext-meta`)
+- `logging`: service logging setup (`logging::init`, `log_config!`, panic hook, `Outage`) via `tracing-subscriber`
 
 Use minimal features when needed, for example:
 
 ```toml
 [dependencies]
-hc-homie5 = { version = "0.10", default-features = false, features = ["base"] }
+hc-homie5 = { version = "0.12", default-features = false, features = ["base"] }
 ```
 
 ## Quick start
@@ -56,7 +58,7 @@ hc-homie5 = { version = "0.10", default-features = false, features = ["base"] }
 
 ```toml
 [dependencies]
-hc-homie5 = "0.10"
+hc-homie5 = "0.12"
 homie5 = "0.12"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
@@ -140,6 +142,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - `{PREFIX}_HOMIE_CA_PATH` (optional)
 - `{PREFIX}_HOMIE_CLIENT_CERT` (optional)
 - `{PREFIX}_HOMIE_CLIENT_KEY` (optional)
+
+## Logging
+
+The crate logs through `tracing`. Services set up logging with the `logging` feature as the
+first statement of `main`:
+
+```rust
+hc_homie5::logging::init(hc_homie5::log_config!("HC_MYBRIDGE"))?;
+```
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `{PREFIX}_LOG_LEVEL` | `info` | Level of the service's own crate (`off`, `error`, `warn`, `info`, `debug`, `trace`); all other crates stay at `warn` |
+| `RUST_LOG` | – | Full `tracing` filter; overrides `{PREFIX}_LOG_LEVEL` |
+| `{PREFIX}_LOG_FORMAT` | `text` | `text` or `json` (one object per line) |
+| `NO_COLOR` | – | Disables ANSI colors; colors are only used when stdout is a terminal |
+
+Every line carries the target and `file:line`. `init` also installs a panic hook that logs the
+panic as one ERROR event and exits with code 1 (`LogConfig::exit_on_panic(false)` keeps the
+process running). `logging::Outage` logs a recurring failure once when it starts and once when it
+ends; `logging::truncate` and `logging::chain` format large payloads and error chains for fields.
 
 ## Typical architecture
 

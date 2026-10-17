@@ -18,7 +18,7 @@ impl DelayedSender {
         let handle = Some(tokio::task::spawn(async move {
             tokio::time::sleep(delay).await;
             if let Err(err) = sender.send(task).await {
-                log::warn!("Error sending scheduled event: {}", err)
+                tracing::debug!(error = %err, "cannot send scheduled event; receiver closed")
             }
         }));
         Self { handle }
@@ -32,7 +32,7 @@ impl DelayedSender {
         self.handle = Some(tokio::task::spawn(async move {
             tokio::time::sleep(delay).await;
             if let Err(err) = sender.send(task).await {
-                log::warn!("Error sending scheduled event: {}", err)
+                tracing::debug!(error = %err, "cannot send scheduled event; receiver closed")
             }
         }));
     }

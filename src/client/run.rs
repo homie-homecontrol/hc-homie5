@@ -9,6 +9,8 @@ use tokio::sync::{
     watch,
 };
 
+use crate::logging::{truncate, PAYLOAD_MAX};
+
 use super::{
     HomieClientError, HomieClientEvent, HomieClientHandle, HomieMQTTClient, PendingPublishTracker,
 };
@@ -39,7 +41,7 @@ pub fn run_homie_client_with_options(
     ),
     HomieClientError,
 > {
-    log::trace!("Connecting to mqtt: {}", mqttoptions.client_id());
+    tracing::trace!(client_id = %mqttoptions.client_id(), "starting MQTT client");
     let (sender, receiver) = mpsc::channel(channel_size);
 
     let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, channel_size);
@@ -55,7 +57,7 @@ pub fn run_homie_client_with_options(
                 poll_res = eventloop.poll() => poll_res,
                 _exit = stop_receiver.changed() => {
                     if *stop_receiver.borrow() {
-                        log::trace!("Received stop signal. Exiting...");
+                        tracing::trace!("MQTT client stop requested");
                         break;
                     }
                     continue;
@@ -79,38 +81,38 @@ pub fn run_homie_client_with_options(
                                                 .await?;
                                         }
                                         Ok(None) => {
-                                            log::error!(
-                                                "Error parsing MQTT message.\n  Topic: [{}]\n  Payload: [{:?}]\n  Homie parse error: {}",
-                                                p.topic,
-                                                p.payload,
-                                                homie_err,
+                                            tracing::warn!(
+                                                topic = %p.topic,
+                                                payload = %truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
+                                                error = %homie_err,
+                                                "unparsable MQTT message ignored"
                                             );
                                         }
                                         Err(meta_err) => {
-                                            log::error!(
-                                                "Error parsing MQTT message.\n  Topic: [{}]\n  Payload: [{:?}]\n  Homie parse error: {}\n  Meta parse error: {}",
-                                                p.topic,
-                                                p.payload,
-                                                homie_err,
-                                                meta_err
+                                            tracing::warn!(
+                                                topic = %p.topic,
+                                                payload = %truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
+                                                error = %homie_err,
+                                                meta_error = %meta_err,
+                                                "unparsable MQTT message ignored"
                                             );
                                         }
                                     }
                                 }
                                 #[cfg(not(feature = "ext-meta"))]
                                 {
-                                    log::error!(
-                                        "Error parsing MQTT message.\n  Topic: [{}]\n  Payload: [{:?}]\n  Homie parse error: {}",
-                                        p.topic,
-                                        p.payload,
-                                        homie_err,
+                                    tracing::warn!(
+                                        topic = %p.topic,
+                                        payload = %truncate(&String::from_utf8_lossy(&p.payload), PAYLOAD_MAX),
+                                        error = %homie_err,
+                                        "unparsable MQTT message ignored"
                                     );
                                 }
                             }
                         }
                     }
                     rumqttc::Event::Incoming(rumqttc::Incoming::ConnAck(_)) => {
-                        log::trace!("HOMIE: Connected");
+                        tracing::trace!("MQTT connected");
                         connected = true;
                         first_disconnect_at = None;
                         sender.send(HomieClientEvent::Connect).await?;
@@ -128,7 +130,7 @@ pub fn run_homie_client_with_options(
                         pending_publishes.record_ack(comp.pkid);
                     }
                     rumqttc::Event::Outgoing(rumqttc::Outgoing::Disconnect) => {
-                        log::trace!("HOMIE: Connection closed from our side.",);
+                        tracing::trace!("MQTT connection closed by client");
                         // Nothing can be acknowledged after the disconnect —
                         // release any flush waiters instead of letting them
                         // run into their max_wait.
@@ -152,27 +154,24 @@ pub fn run_homie_client_with_options(
                     // request channel and are kept.
                     pending_publishes.clear_in_flight();
 
-                    if first_disconnect_at.is_none() {
-                        first_disconnect_at = Some(tokio::time::Instant::now());
-                    }
-                    if let (Some(max_dur), Some(since)) = (max_disconnect, first_disconnect_at) {
+                    let since = *first_disconnect_at.get_or_insert_with(tokio::time::Instant::now);
+                    tracing::debug!(error = %err, "MQTT connection error");
+                    sender.send(HomieClientEvent::Error(err)).await?;
+                    if let Some(max_dur) = max_disconnect {
                         if since.elapsed() > max_dur {
-                            log::error!(
-                                "MQTT broker unreachable for {:?}, giving up",
-                                since.elapsed()
+                            tracing::debug!(
+                                outage_secs = since.elapsed().as_secs(),
+                                "MQTT broker unreachable too long; stopping client"
                             );
                             break;
                         }
                     }
-
-                    log::error!("HomieClient: Error connecting mqtt. {:#?}", err);
-                    sender.send(HomieClientEvent::Error(err)).await?;
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             };
         }
         sender.send(HomieClientEvent::Stop).await?;
-        log::trace!("Exiting homie client eventloop...");
+        tracing::trace!("MQTT client stopped");
         Ok(())
     });
     Ok((

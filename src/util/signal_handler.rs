@@ -7,7 +7,7 @@ pub async fn signal_handler<T: Send + 'static>(sender: mpsc::Sender<T>, exit_val
     wait_for_termination().await;
 
     if let Err(err) = sender.send(exit_value).await {
-        log::error!("Error sending exit event: {:#?}", err);
+        tracing::debug!(error = %err, "cannot send exit event; receiver closed");
     }
 }
 
@@ -20,9 +20,9 @@ async fn wait_for_termination() {
     let mut sigquit = signal(SignalKind::quit()).expect("Failed to register SIGQUIT handler");
 
     tokio::select! {
-        _ = sigint.recv() => log::info!("Received SIGINT"),
-        _ = sigterm.recv() => log::info!("Received SIGTERM"),
-        _ = sigquit.recv() => log::info!("Received SIGQUIT"),
+        _ = sigint.recv() => tracing::debug!(signal = "SIGINT", "termination signal received"),
+        _ = sigterm.recv() => tracing::debug!(signal = "SIGTERM", "termination signal received"),
+        _ = sigquit.recv() => tracing::debug!(signal = "SIGQUIT", "termination signal received"),
     }
 }
 
@@ -31,5 +31,5 @@ async fn wait_for_termination() {
     tokio::signal::ctrl_c()
         .await
         .expect("Failed to register Ctrl+C handler");
-    log::info!("Received Ctrl+C");
+    tracing::debug!(signal = "Ctrl+C", "termination signal received");
 }

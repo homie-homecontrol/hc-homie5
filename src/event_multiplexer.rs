@@ -52,7 +52,7 @@ macro_rules! define_event_multiplexer {
                             }
                         )*
                         _ = tokio::time::sleep(timeout), if !all_channels_closed => {
-                            log::trace!("Timeout waiting for events");
+                            $crate::__private::tracing::trace!("timeout waiting for events");
                             $enum_name::Timeout
                         },
                         else => {

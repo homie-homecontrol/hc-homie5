@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use crate::{
     client::HomieMQTTClient,
+    logging::{truncate, PAYLOAD_MAX},
     model::{DescriptionUpdate, DeviceRemove, DeviceUpdate, DiscoveryAction, ValueUpdate},
     store::{AlertUpdate, DeviceStore},
 };
@@ -106,7 +107,7 @@ impl HomieDiscovery {
                 issues,
             } => {
                 for issue in &issues {
-                    log::warn!("[{}] invalid description: {}", device.to_topic(), issue);
+                    tracing::warn!(device = %device.device_id(), issue = %issue, "invalid device description entry ignored");
                 }
                 self.handle_description(device, description, devices)
                     .await?
@@ -148,7 +149,7 @@ impl HomieDiscovery {
                     .homie_unsubscribe(self.client.unsubscribe_props(&device, description))
                     .await?;
 
-                log::info!("============> Removed device {}", dev.device_id());
+                tracing::debug!(device = %dev.device_id(), "device removed");
                 Some(DiscoveryAction::DeviceRemoved(dev))
             }
             _ => Some(DiscoveryAction::Unhandled(event)),
@@ -185,10 +186,6 @@ impl HomieDiscovery {
             }
             DescriptionUpdate::NoChange => None,
             DescriptionUpdate::NotFound => {
-                log::warn!(
-                    "Warning, description update received for non discovered device [{}]",
-                    device.to_topic()
-                );
                 return Err(DiscoveryError::DescriptionForNonExistingDevice(device));
             }
         };
@@ -246,18 +243,26 @@ impl HomieDiscovery {
         devices: &mut DeviceStore,
     ) -> Option<DiscoveryAction> {
         let device = devices.get_device_mut(property.device_ref())?;
-        let Some((Ok(value), retained)) = device.description.as_ref().and_then(|desc| {
+        let (parsed, retained) = device.description.as_ref().and_then(|desc| {
             desc.with_property(&property, |prop_desc| {
-                //log::debug!("PropertyValue: {} - {:?}", property.to_topic(), prop_desc,);
-                if !prop_desc.retained {
-                    log::debug!("PropertyValue: {} - {}", property.to_topic(), value,);
-                }
-
                 (HomieValue::parse(&value, prop_desc), prop_desc.retained)
             })
-        }) else {
-            return None;
+        })?;
+        let value = match parsed {
+            Ok(parsed) => parsed,
+            Err(err) => {
+                tracing::debug!(
+                    topic = %property.to_topic(),
+                    value = %truncate(&value, PAYLOAD_MAX),
+                    error = %err,
+                    "invalid property value ignored"
+                );
+                return None;
+            }
         };
+        if !retained {
+            tracing::trace!(topic = %property.to_topic(), value = %value, "non-retained property value");
+        }
         if retained {
             match device
                 .prop_values
@@ -291,12 +296,21 @@ impl HomieDiscovery {
         target: String,
         devices: &mut DeviceStore,
     ) -> Option<DiscoveryAction> {
-        // log::debug!("PropertyTarget: {} - {}", property.to_topic(), target);
         let device = devices.get_device_mut(property.device_ref())?;
-        let Some(Ok(value)) = device.description.as_ref().and_then(|desc| {
+        let parsed = device.description.as_ref().and_then(|desc| {
             desc.with_property(&property, |prop_desc| HomieValue::parse(&target, prop_desc))
-        }) else {
-            return None;
+        })?;
+        let value = match parsed {
+            Ok(parsed) => parsed,
+            Err(err) => {
+                tracing::debug!(
+                    topic = %property.to_topic(),
+                    target = %truncate(&target, PAYLOAD_MAX),
+                    error = %err,
+                    "invalid property target ignored"
+                );
+                return None;
+            }
         };
         match device
             .prop_values

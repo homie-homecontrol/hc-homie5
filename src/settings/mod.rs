@@ -45,11 +45,11 @@ pub fn bool_setting(prefix: &str, name: &str, default: bool) -> bool {
     let env_var = env_name(prefix, name);
     match std::env::var(&env_var) {
         Ok(raw) => parse_bool_setting(&raw).unwrap_or_else(|| {
-            log::warn!(
-                "Invalid boolean setting {}={:?}; expected 'true' or 'false'. Using default: {}",
-                env_var,
-                raw,
-                default
+            tracing::warn!(
+                variable = %env_var,
+                value = %raw,
+                default,
+                "invalid boolean setting; expected true or false, using the default"
             );
             default
         }),

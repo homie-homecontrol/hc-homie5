@@ -13,9 +13,9 @@ use super::{HomieClientEvent, HomieMQTTClient};
 pub enum HomieClientError {
     #[error("Mqtt Client error: {0}")]
     MqttClient(#[from] ClientError),
-    #[error("Error waiting for homie client task to complete: {0} -- {0:#?}")]
+    #[error("Error waiting for homie client task to complete: {0}")]
     JoinError(#[from] JoinError),
-    #[error("Hhomie client channel is closed. Error sending event via mpsc::channel.")]
+    #[error("Homie client channel is closed. Error sending event via mpsc::channel.")]
     ChannelClosed,
     #[error("TLS configuration error: {0}")]
     TlsConfig(String),
@@ -98,10 +98,10 @@ impl MqttClientConfig {
         self.client_id = Some(client_id.into());
         let id = self.client_id.as_ref().unwrap();
         if id.len() > 23 {
-            log::warn!(
-                "Warning, client id [{}] exceeds 23 (<{}) character length limit of mqtt spec!",
-                id,
-                id.len()
+            tracing::warn!(
+                client_id = %id,
+                length = id.len(),
+                "MQTT client id exceeds the 23 character limit of the MQTT 3.1.1 spec"
             );
         }
         self

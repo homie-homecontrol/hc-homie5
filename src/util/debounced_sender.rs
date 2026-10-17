@@ -60,7 +60,7 @@ where
                 }
                 // After the debounce period, send the last pending event to the target.
                 if let Err(e) = target.send(pending_event).await {
-                    eprintln!("Failed to send debounced event: {:?}", e);
+                    tracing::debug!(error = %e, "cannot send debounced event; receiver closed");
                     // Optionally, you could decide to break out of the loop here if the target is gone.
                 }
             }

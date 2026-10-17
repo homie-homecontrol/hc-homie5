@@ -1,6 +1,6 @@
 [package]
 name = "hc-homie5"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 publish = true
 description = "Provides higher level function implementation for homie5 homie devices (discovery and device implementation)."
@@ -17,9 +17,11 @@ macros = ["dep:hc-homie5-macros"]
 framework = ["dep:rumqttc","dep:rand","dep:tokio"]
 tokio = ["dep:tokio", "dep:tokio-util"]
 ext-meta = ["homie5/ext-meta"]
+logging = ["dep:tracing-subscriber"]
 
 [dependencies]
-log = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json"], optional = true }
 rumqttc = { version = "0.25", optional = true }
 thiserror = "2.0"
 tokio = { version = "1.52", features = ["rt", "macros", "sync", "time", "signal"], optional = true }

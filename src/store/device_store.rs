@@ -201,7 +201,7 @@ impl DeviceStore {
     }
 
     pub fn clear(&mut self) {
-        log::debug!("Clearing all devices!");
+        tracing::debug!("clearing all devices");
         self.0.clear();
     }
 
