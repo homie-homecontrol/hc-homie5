@@ -10,6 +10,7 @@ use serde::{Deserialize, Deserializer};
 use std::collections::HashSet;
 
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PropertyQuery {
     pub id: Option<ValueCondition<HomieID>>,
     pub name: Option<ValueCondition<String>>,
@@ -55,6 +56,7 @@ impl PropertyQuery {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct NodeQuery {
     pub id: Option<ValueCondition<HomieID>>,
     pub name: Option<ValueCondition<String>>,
@@ -76,6 +78,7 @@ impl NodeQuery {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DeviceQuery {
     pub id: Option<ValueCondition<HomieID>>,
     pub name: Option<ValueCondition<String>>,
@@ -123,6 +126,7 @@ impl DeviceQuery {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct QueryDefinition {
     #[serde(default)]
     pub domain: Option<ValueCondition<HomieDomain>>,

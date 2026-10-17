@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ValueMapping<FROM, TO>
 where
     FROM: ValueMatcher,
@@ -81,6 +82,7 @@ where
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ValueMappingIO<IN, OUT>
 where
     IN: ValueMatcher,

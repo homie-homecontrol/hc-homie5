@@ -245,4 +245,26 @@ property:
         mat_query.remove_materialized(&HomieDomain::Default, &device_id, &device_desc);
         assert!(!mat_query.match_query(&expected_ref));
     }
+
+    #[test]
+    fn query_definition_rejects_unknown_field() {
+        // `propertty` used to be ignored, matching every property of every device
+        let res = serde_yaml_ng::from_str::<QueryDefinition>("propertty:\n  id: state\n");
+        assert!(res.is_err(), "{res:?}");
+    }
+
+    #[test]
+    fn device_node_property_queries_reject_unknown_fields() {
+        assert!(serde_yaml_ng::from_str::<DeviceQuery>("idd: device-1\n").is_err());
+        assert!(serde_yaml_ng::from_str::<NodeQuery>("typ: test-type\n").is_err());
+        assert!(serde_yaml_ng::from_str::<PropertyQuery>("datatyp: integer\n").is_err());
+        assert!(serde_yaml_ng::from_str::<QueryDefinition>("node:\n  typ: test-type\n").is_err());
+    }
+
+    #[test]
+    fn query_schema_disallows_additional_properties() {
+        let schema = schemars::schema_for!(QueryDefinition);
+        let additional = schema.get("additionalProperties").and_then(|v| v.as_bool());
+        assert_eq!(additional, Some(false), "{schema:?}");
+    }
 }

@@ -149,4 +149,23 @@ mod tests {
             assert_eq!(unmapped, "baz");
         }
     }
+
+    #[test]
+    fn value_mapping_rejects_unknown_field() {
+        let res =
+            serde_yaml_ng::from_str::<ValueMapping<String, String>>("from: a\nto: b\nextra: c\n");
+        assert!(res.is_err(), "{res:?}");
+    }
+
+    #[test]
+    fn value_mapping_io_rejects_in_out() {
+        // `in`/`out` used to yield two empty lists
+        let res = serde_yaml_ng::from_str::<ValueMappingIO<String, String>>(
+            "in:\n  - { from: a, to: b }\nout: []\n",
+        );
+        assert!(res.is_err(), "{res:?}");
+        let io: ValueMappingIO<String, String> =
+            serde_yaml_ng::from_str("input:\n  - { from: a, to: b }\noutput: []\n").unwrap();
+        assert_eq!(io.input.len(), 1);
+    }
 }
