@@ -28,6 +28,10 @@ mod tests {
         id.try_into().unwrap()
     }
 
+    fn other_domain() -> HomieDomain {
+        "other".try_into().unwrap()
+    }
+
     #[test]
     fn test_handle_device_overlay_existing_device() {
         let mut handler = MetaOverlayHandler::new(test_domain());
@@ -262,5 +266,81 @@ mod tests {
         assert!(device
             .meta_overlays
             .contains_key(&provider_id("provider-2")));
+    }
+
+    #[test]
+    fn test_remove_provider_keeps_other_domains() {
+        let mut handler = MetaOverlayHandler::new(test_domain());
+        let mut other_handler = MetaOverlayHandler::new(other_domain());
+        let mut store = DeviceStore::new();
+
+        // The same device and provider IDs exist in both domains
+        let dref = device_ref("dev-1");
+        let other_dref = DeviceRef::new(other_domain(), device_id("dev-1"));
+        store.add(&dref, HomieDeviceStatus::Ready);
+        store.add(&other_dref, HomieDeviceStatus::Ready);
+        let msg = MetaMessage::DeviceOverlay {
+            homie_domain: test_domain(),
+            provider_id: provider_id("provider-1"),
+            device_id: device_id("dev-1"),
+            overlay: test_overlay(),
+        };
+        handler.handle_meta_message(msg, &mut store);
+        let msg = MetaMessage::DeviceOverlay {
+            homie_domain: other_domain(),
+            provider_id: provider_id("provider-1"),
+            device_id: device_id("dev-1"),
+            overlay: test_overlay(),
+        };
+        other_handler.handle_meta_message(msg, &mut store);
+
+        // Removing the provider in one domain keeps its overlay in the other
+        let msg = MetaMessage::ProviderRemoval {
+            homie_domain: test_domain(),
+            provider_id: provider_id("provider-1"),
+        };
+        handler.handle_meta_message(msg, &mut store);
+
+        assert!(store.get_device(&dref).unwrap().meta_overlays.is_empty());
+        assert!(store
+            .get_device(&other_dref)
+            .unwrap()
+            .meta_overlays
+            .contains_key(&provider_id("provider-1")));
+    }
+
+    #[test]
+    fn test_apply_pending_ignores_other_domains() {
+        let mut handler = MetaOverlayHandler::new(test_domain());
+        let mut store = DeviceStore::new();
+
+        // Buffered: dev-1 is not yet known in this handler's domain
+        let msg = MetaMessage::DeviceOverlay {
+            homie_domain: test_domain(),
+            provider_id: provider_id("provider-1"),
+            device_id: device_id("dev-1"),
+            overlay: test_overlay(),
+        };
+        handler.handle_meta_message(msg, &mut store);
+
+        // A device with the same ID appears in another domain first
+        let other_dref = DeviceRef::new(other_domain(), device_id("dev-1"));
+        store.add(&other_dref, HomieDeviceStatus::Ready);
+        handler.apply_pending_for_device(&other_dref, &mut store);
+        assert!(store
+            .get_device(&other_dref)
+            .unwrap()
+            .meta_overlays
+            .is_empty());
+
+        // The overlay still reaches its own device
+        let dref = device_ref("dev-1");
+        store.add(&dref, HomieDeviceStatus::Ready);
+        handler.apply_pending_for_device(&dref, &mut store);
+        assert!(store
+            .get_device(&dref)
+            .unwrap()
+            .meta_overlays
+            .contains_key(&provider_id("provider-1")));
     }
 }

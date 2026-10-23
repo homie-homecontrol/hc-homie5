@@ -180,7 +180,8 @@ impl MqttClientConfig {
         };
         let mut mqttoptions =
             rumqttc::MqttOptions::new(client_id, self.hostname.to_owned(), self.port.to_owned());
-        if !self.username.is_empty() && !self.password.is_empty() {
+        // MQTT allows a user name without a password (rumqttc omits an empty one), not a password alone
+        if !self.username.is_empty() {
             mqttoptions.set_credentials(self.username.to_owned(), self.password.to_owned());
         }
         mqttoptions.set_keep_alive(Duration::from_secs(self.keep_alive));
@@ -242,5 +243,47 @@ impl MqttClientConfig {
         }
 
         Ok(mqttoptions)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn credentials(config: MqttClientConfig) -> Option<(String, String)> {
+        config
+            .to_mqtt_options()
+            .unwrap()
+            .credentials()
+            .map(|login| (login.username, login.password))
+    }
+
+    #[test]
+    fn sends_user_name_without_password() {
+        let config = MqttClientConfig::new("localhost").username("user");
+        assert_eq!(
+            credentials(config),
+            Some(("user".to_string(), String::new()))
+        );
+    }
+
+    #[test]
+    fn sends_user_name_and_password() {
+        let config = MqttClientConfig::new("localhost")
+            .username("user")
+            .password("secret");
+        assert_eq!(
+            credentials(config),
+            Some(("user".to_string(), "secret".to_string()))
+        );
+    }
+
+    #[test]
+    fn sends_no_credentials_without_user_name() {
+        assert_eq!(credentials(MqttClientConfig::new("localhost")), None);
+        assert_eq!(
+            credentials(MqttClientConfig::new("localhost").password("secret")),
+            None
+        );
     }
 }
