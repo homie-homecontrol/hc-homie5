@@ -79,6 +79,11 @@ impl MetaOverlayHandler {
 
     /// Apply any pending overlays for a specific device (call after device discovery).
     pub fn apply_pending_for_device(&mut self, device_ref: &DeviceRef, devices: &mut DeviceStore) {
+        // Only devices of this handler's domain; IDs repeat across domains
+        if device_ref.homie_domain() != &self.homie_domain {
+            return;
+        }
+
         // Collect all pending overlays for this device_id across all providers
         let mut overlays_to_apply: Vec<(HomieID, MetaDeviceOverlay)> = Vec::new();
         for (provider_id, per_provider) in &mut self.pending {
@@ -106,16 +111,21 @@ impl MetaOverlayHandler {
         }
     }
 
-    /// Remove all overlays from a specific provider (call when provider disconnects).
+    /// Remove all overlays from a specific provider in this handler's domain (call when provider
+    /// disconnects).
     pub fn remove_provider(&mut self, provider_id: &HomieID, devices: &mut DeviceStore) {
         // Remove from pending
         self.pending.remove(provider_id);
 
-        // Collect device refs first, then mutate
+        // Collect this domain's device refs first, then mutate; provider IDs repeat across domains
         let device_refs: Vec<DeviceRef> = devices
-            .iter()
-            .map(|(domain, device_id, _)| DeviceRef::new(domain.clone(), device_id.clone()))
-            .collect();
+            .get_device_map(&self.homie_domain)
+            .map(|map| {
+                map.keys()
+                    .map(|device_id| DeviceRef::new(self.homie_domain.clone(), device_id.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
 
         for device_ref in device_refs {
             if let Some(device) = devices.get_device_mut(&device_ref) {
