@@ -120,10 +120,35 @@ impl HomieDiscovery {
             Homie5Message::PropertyTarget { property, target } => {
                 self.update_prop_target(property, target, devices)
             }
-            // Retained values are only deleted when properties or devices are removed; the
-            // store follows the device description, so there is nothing to update here.
-            Homie5Message::PropertyValueCleared { .. }
-            | Homie5Message::PropertyTargetCleared { .. } => None,
+            // A retained value can be deleted without removing its property or device.
+            Homie5Message::PropertyValueCleared { property } => {
+                let device = devices.get_device_mut(property.device_ref());
+                device.and_then(|device| {
+                    device
+                        .description
+                        .as_ref()?
+                        .get_property(property.prop_pointer())?;
+                    let from = device.prop_values.clear_value(property.prop_pointer())?;
+                    Some(DiscoveryAction::DevicePropertyValueCleared {
+                        prop: property,
+                        from,
+                    })
+                })
+            }
+            Homie5Message::PropertyTargetCleared { property } => {
+                let device = devices.get_device_mut(property.device_ref());
+                device.and_then(|device| {
+                    device
+                        .description
+                        .as_ref()?
+                        .get_property(property.prop_pointer())?;
+                    let from = device.prop_values.clear_target(property.prop_pointer())?;
+                    Some(DiscoveryAction::DevicePropertyTargetCleared {
+                        prop: property,
+                        from,
+                    })
+                })
+            }
             Homie5Message::DeviceAlert {
                 device,
                 alert_id,

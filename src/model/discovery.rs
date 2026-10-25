@@ -25,6 +25,16 @@ pub enum DiscoveryAction {
         value_last_received: Option<DateTime<Utc>>,
         value_last_changed: Option<DateTime<Utc>>,
     },
+    /// A previously stored retained value was deleted.
+    DevicePropertyValueCleared {
+        prop: PropertyRef,
+        from: HomieValue,
+    },
+    /// A previously stored target was deleted.
+    DevicePropertyTargetCleared {
+        prop: PropertyRef,
+        from: HomieValue,
+    },
     DevicePropertyTargetChanged {
         prop: PropertyRef,
         from: Option<HomieValue>,
