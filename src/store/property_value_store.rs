@@ -116,6 +116,24 @@ impl PropertyValueStore {
         }
     }
 
+    /// Clear a stored value and its timestamps, preserving the target.
+    pub fn clear_value(&mut self, prop: &PropertyPointer) -> Option<HomieValue> {
+        let entry = self.0.get_mut(prop)?;
+        let previous = entry.value.take()?;
+        entry.value_last_received = None;
+        entry.value_last_changed = None;
+        Some(previous)
+    }
+
+    /// Clear a stored target and its timestamps, preserving the value.
+    pub fn clear_target(&mut self, prop: &PropertyPointer) -> Option<HomieValue> {
+        let entry = self.0.get_mut(prop)?;
+        let previous = entry.target.take()?;
+        entry.target_last_received = None;
+        entry.target_last_changed = None;
+        Some(previous)
+    }
+
     pub fn get_value_entry(&self, prop: &PropertyPointer) -> Option<&PropertyValueEntry> {
         self.0.get(prop)
     }
