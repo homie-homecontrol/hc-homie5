@@ -59,7 +59,7 @@ hc-homie5 = { version = "0.16", default-features = false, features = ["base"] }
 ```toml
 [dependencies]
 hc-homie5 = "0.16"
-homie5 = "0.12"
+homie5 = "0.13"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
