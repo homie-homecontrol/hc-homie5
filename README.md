@@ -49,7 +49,7 @@ Use minimal features when needed, for example:
 
 ```toml
 [dependencies]
-hc-homie5 = { version = "0.15", default-features = false, features = ["base"] }
+hc-homie5 = { version = "0.16", default-features = false, features = ["base"] }
 ```
 
 ## Quick start
@@ -58,8 +58,8 @@ hc-homie5 = { version = "0.15", default-features = false, features = ["base"] }
 
 ```toml
 [dependencies]
-hc-homie5 = "0.15"
-homie5 = "0.12"
+hc-homie5 = "0.16"
+homie5 = "0.13"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
