@@ -298,3 +298,50 @@ mod tests {
         assert!(!condition.evaluate(&15));
     }
 }
+
+mod between {
+    use hc_homie5::value::*;
+    use homie5::HomieValue;
+
+    fn between<T: ValueMatcher>(min: T, max: T) -> ValueCondition<T> {
+        ValueCondition::Operator(ValueOperatorCondition {
+            operator: ConditionOperator::Between,
+            value: Some(ValueSet::Multiple(vec![min, max])),
+        })
+    }
+
+    #[test]
+    fn between_includes_both_bounds() {
+        let condition = between(18, 22);
+        assert!(condition.evaluate(&18));
+        assert!(condition.evaluate(&20));
+        assert!(condition.evaluate(&22));
+        assert!(!condition.evaluate(&17));
+        assert!(!condition.evaluate(&23));
+    }
+
+    #[test]
+    fn between_needs_exactly_two_bounds() {
+        for value in [
+            Some(ValueSet::Single(20)),
+            Some(ValueSet::Multiple(vec![18])),
+            Some(ValueSet::Multiple(vec![18, 20, 22])),
+            None,
+        ] {
+            let condition = ValueCondition::Operator(ValueOperatorCondition {
+                operator: ConditionOperator::Between,
+                value,
+            });
+            assert!(!condition.evaluate(&20));
+        }
+    }
+
+    #[test]
+    fn between_parses_from_yaml_for_homie_values() {
+        let yaml = "operator: between\nvalue:\n  - Float: 18.0\n  - Float: 22.0\n";
+        let condition: ValueCondition<HomieValue> = serde_yaml_ng::from_str(yaml).unwrap();
+        assert!(condition.evaluate(&HomieValue::Float(21.5)));
+        assert!(!condition.evaluate(&HomieValue::Float(22.5)));
+        assert!(!condition.evaluate_option(None));
+    }
+}

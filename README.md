@@ -22,7 +22,7 @@ The public API is organized into domain-oriented submodules:
 | `store` | base | `DeviceStore`, `PropertyValueStore`, `AlertStore` — in-memory state |
 | `model` | base | `Device`, `PropertyValueEntry`, `DiscoveryAction` — data types |
 | `query` | base | `QueryDefinition`, `MaterializedQuery` — property filtering |
-| `value` | base | `ValueCondition`, `ValueMapping`, `ValueMappingIO` — matching/mapping |
+| `value` | base | `ValueCondition`, `ConditionTree` (all/any/not), `ValueMapping`, `ValueMappingIO` — matching/mapping |
 | `connection` | base | `ConnectionState`, `ConnectionEvent` — connection lifecycle FSM |
 | `alerts` | base | `AlertSpec`, `AlertEngine`, `AlertState` — alert engine |
 | `util` | base | `UniqueByIter` and other helpers |
@@ -49,7 +49,7 @@ Use minimal features when needed, for example:
 
 ```toml
 [dependencies]
-hc-homie5 = { version = "0.16", default-features = false, features = ["base"] }
+hc-homie5 = { version = "0.17", default-features = false, features = ["base"] }
 ```
 
 ## Quick start
@@ -58,7 +58,7 @@ hc-homie5 = { version = "0.16", default-features = false, features = ["base"] }
 
 ```toml
 [dependencies]
-hc-homie5 = "0.16"
+hc-homie5 = "0.17"
 homie5 = "0.13"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```

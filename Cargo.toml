@@ -1,6 +1,6 @@
 [package]
 name = "hc-homie5"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 publish = true
 description = "Provides higher level function implementation for homie5 homie devices (discovery and device implementation)."
@@ -38,3 +38,4 @@ hc-homie5-smarthome = { version = "0.13" }
 
 [dev-dependencies]
 serde_yaml_ng = "0.10"
+serde_json = "1.0"

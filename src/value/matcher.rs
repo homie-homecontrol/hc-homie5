@@ -56,6 +56,13 @@ where
             ConditionOperator::MatchAlways => true,
             ConditionOperator::IsEmpty => false,
             ConditionOperator::Exists => true,
+            ConditionOperator::Between => match operand {
+                Some(ValueSet::Multiple(ref bounds)) => match bounds.as_slice() {
+                    [min, max] => self >= min && self <= max,
+                    _ => false,
+                },
+                _ => false,
+            },
         }
     }
 
