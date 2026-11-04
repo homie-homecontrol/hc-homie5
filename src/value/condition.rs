@@ -100,6 +100,8 @@ pub enum ConditionOperator {
     MatchAlways,
     IsEmpty,
     Exists,
+    /// Inclusive range: the operand is a list of exactly two values `[min, max]`.
+    Between,
 }
 
 impl FromStr for ConditionOperator {
@@ -118,6 +120,7 @@ impl FromStr for ConditionOperator {
             "matchAlways" => Ok(ConditionOperator::MatchAlways),
             "isEmpty" => Ok(ConditionOperator::IsEmpty),
             "exists" => Ok(ConditionOperator::Exists),
+            "between" => Ok(ConditionOperator::Between),
             _ => Err(()),
         }
     }
@@ -136,6 +139,7 @@ impl std::fmt::Display for ConditionOperator {
             ConditionOperator::MatchAlways => "matchAlways",
             ConditionOperator::IsEmpty => "isEmpty",
             ConditionOperator::Exists => "exists",
+            ConditionOperator::Between => "between",
         };
         f.write_str(s)
     }
