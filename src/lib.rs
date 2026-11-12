@@ -20,6 +20,10 @@ pub mod device;
 #[cfg(feature = "framework")]
 pub mod settings;
 
+// ── template engine (feature: template) ───────────────
+#[cfg(feature = "template")]
+pub mod template;
+
 // ── tokio modules ────────────────────────────────────
 #[cfg(feature = "tokio")]
 mod event_multiplexer;

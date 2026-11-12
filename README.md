@@ -31,6 +31,7 @@ The public API is organized into domain-oriented submodules:
 | `controller` | framework | `DeviceManager`, `HomieDiscovery`, `HomieControllerClient` — controller-side |
 | `settings` | framework | `HomieSettings` — env-driven configuration |
 | `logging` | base / logging | `truncate`, `chain` (base); `init`, `LogConfig`, `Outage` (logging) — shared service logging |
+| `template` | template | `Engine`, `TemplateRegistry`, `ExpandContext`, `check`, `expand` — structural YAML config templates (`use:`/`with:`, `for_each`, `when:`, `{{ }}` expressions) |
 
 Async utilities (`DebouncedSender`, `DelayedSender`) and the `define_event_multiplexer!` macro require the `tokio` feature.
 
@@ -44,6 +45,7 @@ Default features: `base`, `macros`, `framework`, `tokio`.
 - `tokio`: async utilities (`DebouncedSender`, `DelayedSender`) and signal handling
 - `ext-meta`: enables Homie meta extension integration (forwarded from `homie5/ext-meta`)
 - `logging`: service logging setup (`logging::init`, `log_config!`, panic hook, `Outage`) via `tracing-subscriber`
+- `template`: YAML config template engine (`template` module) with `minijinja` expressions; not in default features
 
 Use minimal features when needed, for example:
 
