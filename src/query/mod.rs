@@ -1,4 +1,4 @@
-use crate::value::ValueCondition;
+use crate::value::{ConditionOperator, ValueCondition};
 use homie5::{
     device_description::{
         HomieDeviceDescription, HomieNodeDescription, HomiePropertyDescription, HomiePropertyFormat,
@@ -7,7 +7,7 @@ use homie5::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -125,6 +125,105 @@ impl DeviceQuery {
     }
 }
 
+/// Device-level `$meta` annotations a [`QueryDefinition`] can match against.
+///
+/// With the `ext-meta` feature it is implemented for
+/// [`MetaDeviceOverlay`](homie5::extensions::meta::MetaDeviceOverlay) (pass the merged overlay,
+/// see `Device::merged_meta_overlay`) and for plain annotation maps
+/// ([`MetaEntries`](homie5::extensions::meta::MetaEntries)).
+pub trait MetaAnnotations {
+    /// Values of the device annotation `key`, or `None` when it is absent.
+    /// A scalar annotation is a one-element slice.
+    fn device_annotation(&self, key: &str) -> Option<&[String]>;
+}
+
+#[cfg(feature = "ext-meta")]
+impl MetaAnnotations for homie5::extensions::meta::MetaEntries {
+    fn device_annotation(&self, key: &str) -> Option<&[String]> {
+        use homie5::extensions::meta::MetaValue;
+        match self.get(key)? {
+            MetaValue::Text(value) => Some(std::slice::from_ref(value)),
+            MetaValue::List(values) => Some(values.as_slice()),
+        }
+    }
+}
+
+#[cfg(feature = "ext-meta")]
+impl MetaAnnotations for homie5::extensions::meta::MetaDeviceOverlay {
+    fn device_annotation(&self, key: &str) -> Option<&[String]> {
+        self.device
+            .as_ref()?
+            .annotations
+            .as_ref()?
+            .device_annotation(key)
+    }
+}
+
+/// Condition on one `$meta` annotation.
+///
+/// - A plain [`ValueCondition`] matches if any annotation value matches (a scalar annotation is a
+///   one-element list). `<>` and `includesNone` are the negation of `=` and `includesAny` over the
+///   list, so they require every value to match.
+/// - `first: <condition>` matches the first value only.
+///
+/// A missing annotation, or an empty list, counts as no value: only `isEmpty` and `matchAlways`
+/// match it.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum MetaCondition {
+    First(MetaFirstCondition),
+    Any(ValueCondition<String>),
+}
+
+/// The `first:` form of a [`MetaCondition`].
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetaFirstCondition {
+    pub first: ValueCondition<String>,
+}
+
+impl MetaCondition {
+    /// Evaluates the condition against an annotation's values (`None` when it is absent).
+    pub fn evaluate(&self, values: Option<&[String]>) -> bool {
+        let values = values.filter(|values| !values.is_empty());
+        match self {
+            MetaCondition::First(cond) => cond
+                .first
+                .evaluate_option(values.and_then(|values| values.first())),
+            MetaCondition::Any(cond) => match values {
+                None => cond.evaluate_option(None),
+                Some(values) if is_negation(cond) => {
+                    values.iter().all(|value| cond.evaluate(value))
+                }
+                Some(values) => values.iter().any(|value| cond.evaluate(value)),
+            },
+        }
+    }
+}
+
+fn is_negation(cond: &ValueCondition<String>) -> bool {
+    matches!(
+        cond,
+        ValueCondition::Operator(op) if matches!(op.operator, ConditionOperator::NotEqual | ConditionOperator::IncludesNone)
+    )
+}
+
+/// Selects devices by their device-level `$meta` annotations; every listed annotation must match.
+#[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetaQuery {
+    #[serde(default)]
+    pub annotations: BTreeMap<String, MetaCondition>,
+}
+
+impl MetaQuery {
+    pub fn match_query(&self, meta: Option<&dyn MetaAnnotations>) -> bool {
+        self.annotations
+            .iter()
+            .all(|(key, cond)| cond.evaluate(meta.and_then(|meta| meta.device_annotation(key))))
+    }
+}
+
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct QueryDefinition {
@@ -136,14 +235,23 @@ pub struct QueryDefinition {
     pub node: Option<NodeQuery>,
     #[serde(default)]
     pub property: Option<PropertyQuery>,
+    /// Device-level `$meta` annotation conditions, matched against the overlay passed to
+    /// [`QueryDefinition::match_query`].
+    #[serde(default)]
+    pub meta: Option<MetaQuery>,
 }
 
 impl QueryDefinition {
+    /// Returns every property of the device that matches the query.
+    ///
+    /// `meta` holds the device's `$meta` annotations; with `None` a query with `meta` conditions
+    /// sees every annotation as missing.
     pub fn match_query(
         &self,
         domain: &HomieDomain,
         id: &HomieID,
         device_desc: &HomieDeviceDescription,
+        meta: Option<&dyn MetaAnnotations>,
     ) -> Vec<PropertyRef> {
         let mut matched_properties = Vec::new();
 
@@ -159,6 +267,10 @@ impl QueryDefinition {
             .device
             .as_ref()
             .is_none_or(|device_query| device_query.match_query(id, device_desc))
+            && self
+                .meta
+                .as_ref()
+                .is_none_or(|meta_query| meta_query.match_query(meta))
         {
             // Iterate through all nodes and their properties
             for (node_id, node_desc) in &device_desc.nodes {
@@ -205,29 +317,38 @@ impl MaterializedQuery {
         }
     }
 
+    /// Re-evaluates the device and replaces its references; call it again when the device's
+    /// description or `$meta` overlay changes.
     pub fn add_materialized(
         &mut self,
         domain: &HomieDomain,
         id: &HomieID,
         device_desc: &HomieDeviceDescription,
+        meta: Option<&dyn MetaAnnotations>,
     ) {
         // Remove all refs belonging to the given device ID
         self.mat_refs.retain(|prop_ref| prop_ref.device_id() != id);
 
-        let new_refs = self.query.match_query(domain, id, device_desc);
+        let new_refs = self.query.match_query(domain, id, device_desc, meta);
         self.mat_refs.extend(new_refs); // Add new PropertyRefs to the HashSet
     }
 
+    /// Removes every reference of the device. `_device_desc` is unused and kept for compatibility:
+    /// removal no longer re-evaluates the query, so it does not depend on the overlay or
+    /// description that produced the match.
     pub fn remove_materialized(
         &mut self,
         domain: &HomieDomain,
         id: &HomieID,
-        device_desc: &HomieDeviceDescription,
+        _device_desc: &HomieDeviceDescription,
     ) {
-        let to_remove = self.query.match_query(domain, id, device_desc);
-        for prop_ref in to_remove {
-            self.mat_refs.remove(&prop_ref); // Remove matching PropertyRefs from the HashSet
-        }
+        self.mat_refs
+            .retain(|prop_ref| !(prop_ref.homie_domain() == domain && prop_ref.device_id() == id));
+    }
+
+    /// The underlying query definition.
+    pub fn query(&self) -> &QueryDefinition {
+        &self.query
     }
 
     pub fn match_query(&self, prop_ref: &PropertyRef) -> bool {

@@ -150,8 +150,9 @@ impl<'de> Deserialize<'de> for ConditionOperator {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        ConditionOperator::from_str(s)
+        // Owned: YAML/JSON trees and untagged-enum buffering only offer owned strings.
+        let s = String::deserialize(deserializer)?;
+        ConditionOperator::from_str(&s)
             .map_err(|_| de::Error::custom(format!("Invalid ConditionOperator: {}", s)))
     }
 }

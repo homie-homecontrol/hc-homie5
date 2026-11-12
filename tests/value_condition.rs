@@ -344,4 +344,34 @@ mod between {
         assert!(!condition.evaluate(&HomieValue::Float(22.5)));
         assert!(!condition.evaluate_option(None));
     }
+
+    // Regression: a YAML tree (serde_yaml_ng::Value) only offers owned strings; the operator
+    // must deserialize from it exactly as from text.
+    #[test]
+    fn operator_deserializes_from_text_and_from_yaml_tree() {
+        let yaml = "operator: \">=\"\nvalue: 3\n";
+        let from_text: ValueCondition<i64> = serde_yaml_ng::from_str(yaml).unwrap();
+        let tree: serde_yaml_ng::Value = serde_yaml_ng::from_str(yaml).unwrap();
+        let from_tree: ValueCondition<i64> = serde_yaml_ng::from_value(tree).unwrap();
+        for condition in [from_text, from_tree] {
+            assert!(condition.evaluate(&3));
+            assert!(!condition.evaluate(&2));
+        }
+
+        let op: ConditionOperator =
+            serde_yaml_ng::from_value(serde_yaml_ng::Value::String("includesAny".into())).unwrap();
+        assert_eq!(op, ConditionOperator::IncludesAny);
+        let op: ConditionOperator = serde_json::from_value(serde_json::json!("between")).unwrap();
+        assert_eq!(op, ConditionOperator::Between);
+    }
+
+    #[test]
+    fn invalid_operator_is_rejected_from_yaml_tree() {
+        let err = serde_yaml_ng::from_value::<ConditionOperator>(serde_yaml_ng::Value::String(
+            "~=".into(),
+        ))
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("Invalid ConditionOperator: ~="), "{err}");
+    }
 }
