@@ -92,59 +92,79 @@ property:
         assert_eq!(refs, cmp_refs);
     }
 
-    // Test deserialization and evaluation of vector operators on DeviceQuery.
-    #[test]
-    fn test_deserialize_and_evaluate_vector_includes_any() {
-        let yaml = r#"
-children:
-    operator: "includesAny"
-    value:
-      - ["child1", "child2"]
-      - ["child3"]
-"#;
-        let query: DeviceQuery = serde_yaml_ng::from_str(yaml).unwrap();
-        let children = vec!["child1".try_into().unwrap(), "child4".try_into().unwrap()];
-        assert!(query.children.as_ref().unwrap().evaluate(&children));
+    fn ids(items: &[&str]) -> Vec<HomieID> {
+        items
+            .iter()
+            .map(|s| HomieID::try_from(s.to_string()).unwrap())
+            .collect()
+    }
 
-        let children = vec!["child5".try_into().unwrap()];
-        assert!(!query.children.as_ref().unwrap().evaluate(&children));
+    // DeviceQuery list fields take a ListCondition.
+    #[test]
+    fn children_any_and_empty() {
+        let query: DeviceQuery = serde_yaml_ng::from_str(
+            "children:\n  any:\n    operator: \"=\"\n    value: [child1, child3]\n",
+        )
+        .unwrap();
+        let cond = query.children.as_ref().unwrap();
+        assert!(cond.evaluate(&ids(&["child1", "child4"])));
+        assert!(!cond.evaluate(&ids(&["child5"])));
+        assert!(!cond.evaluate(&[]));
+
+        let query: DeviceQuery = serde_yaml_ng::from_str("children: { empty: true }\n").unwrap();
+        let cond = query.children.as_ref().unwrap();
+        assert!(cond.evaluate(&[]));
+        assert!(!cond.evaluate(&ids(&["child1"])));
     }
 
     #[test]
-    fn test_deserialize_and_evaluate_vector_includes_all() {
-        let yaml = r#"
-children:
-    operator: "="
-    value:
-      - ["child1", "child2", "child3"]
-"#;
-        let query: DeviceQuery = serde_yaml_ng::from_str(yaml).unwrap();
-        let children = vec![
-            "child1".try_into().unwrap(),
-            "child2".try_into().unwrap(),
-            "child3".try_into().unwrap(),
-        ];
-        assert!(query.children.as_ref().unwrap().evaluate(&children));
+    fn extensions_any_pattern_and_none() {
+        let query: DeviceQuery = serde_yaml_ng::from_str(
+            "extensions:\n  any: { pattern: \"^org\\\\.homie\\\\.meta:\" }\n",
+        )
+        .unwrap();
+        let cond = query.extensions.as_ref().unwrap();
+        assert!(cond.evaluate(&[
+            "org.homie.legacy-stats:0.1.1:[4.x]".to_string(),
+            "org.homie.meta:0.1.0:[5.x]".to_string()
+        ]));
+        assert!(!cond.evaluate(&["org.homie.legacy-stats:0.1.1:[4.x]".to_string()]));
+        assert!(!cond.evaluate(&["xorg.homie.meta:0.1.0".to_string()]));
 
-        let children = vec!["child5".try_into().unwrap()];
-        assert!(!query.children.as_ref().unwrap().evaluate(&children));
+        let query: DeviceQuery = serde_yaml_ng::from_str(
+            "extensions:\n  none: { operator: includesAny, value: [deprecated, legacy] }\n",
+        )
+        .unwrap();
+        let cond = query.extensions.as_ref().unwrap();
+        assert!(cond.evaluate(&["mqtt".to_string(), "homie5".to_string()]));
+        assert!(!cond.evaluate(&["legacy".to_string(), "mqtt".to_string()]));
     }
 
     #[test]
-    fn test_deserialize_and_evaluate_extensions_includes_none() {
-        let yaml = r#"
-extensions:
-    operator: "includesNone"
-    value:
-      - "deprecated"
-      - "legacy"
-"#;
-        let query: DeviceQuery = serde_yaml_ng::from_str(yaml).unwrap();
-        let extensions = vec!["mqtt".to_string(), "homie5".to_string()];
-        assert!(query.extensions.as_ref().unwrap().evaluate(&extensions));
+    fn device_query_matches_children_and_extensions() {
+        let desc = DeviceDescriptionBuilder::new()
+            .add_child(HomieID::new_const("child-1"))
+            .add_extension("org.homie.meta:0.1.0:[5.x]".to_string())
+            .build();
+        let id = HomieID::new_const("bridge");
+        let query: DeviceQuery = serde_yaml_ng::from_str(
+            "children: { any: child-1 }\nextensions: { any: { pattern: \"^org\\\\.homie\\\\.meta:\" } }\n",
+        )
+        .unwrap();
+        assert!(query.match_query(&id, &desc));
+        let query: DeviceQuery = serde_yaml_ng::from_str("children: { empty: true }\n").unwrap();
+        assert!(!query.match_query(&id, &desc));
+        let query: DeviceQuery = serde_yaml_ng::from_str("children: { empty: false }\n").unwrap();
+        assert!(query.match_query(&id, &desc));
+    }
 
-        let extensions = vec!["legacy".to_string(), "mqtt".to_string()];
-        assert!(!query.extensions.as_ref().unwrap().evaluate(&extensions));
+    #[test]
+    fn list_fields_reject_bare_conditions() {
+        assert!(serde_yaml_ng::from_str::<DeviceQuery>("children: child1\n").is_err());
+        assert!(serde_yaml_ng::from_str::<DeviceQuery>(
+            "extensions:\n  operator: includesAny\n  value: [x]\n"
+        )
+        .is_err());
     }
 
     // --- New tests for NodeQuery ---
@@ -317,8 +337,10 @@ mod meta {
         MetaValue::List(items.iter().map(|s| s.to_string()).collect())
     }
 
-    fn matches(yaml: &str, meta: Option<&MetaDeviceOverlay>) -> bool {
-        let query: QueryDefinition = serde_yaml_ng::from_str(yaml).unwrap();
+    /// Whether `annotations` (a YAML mapping body for `meta.annotations`) matches `meta`.
+    fn matches(annotations: &str, meta: Option<&MetaDeviceOverlay>) -> bool {
+        let yaml = format!("meta:\n  annotations: {annotations}\n");
+        let query: QueryDefinition = serde_yaml_ng::from_str(&yaml).unwrap();
         let refs = query.match_query(
             &HomieDomain::Default,
             &HomieID::new_const("dev-1"),
@@ -329,147 +351,109 @@ mod meta {
     }
 
     #[test]
-    fn list_annotation_matches_any_element() {
+    fn any_with_literal_operator_and_pattern() {
+        let meta = overlay(&[("roles", list(&["heating", "smart-thermostat"]))]);
+        assert!(matches("{ roles: { any: smart-thermostat } }", Some(&meta)));
+        assert!(!matches("{ roles: { any: lighting } }", Some(&meta)));
+        assert!(matches(
+            "{ roles: { any: { operator: \"=\", value: [lighting, heating] } } }",
+            Some(&meta)
+        ));
+        assert!(!matches(
+            "{ roles: { any: { operator: \"=\", value: [lighting, audio] } } }",
+            Some(&meta)
+        ));
+        assert!(matches(
+            "{ roles: { any: { pattern: '^smart-' } } }",
+            Some(&meta)
+        ));
+        assert!(!matches(
+            "{ roles: { any: { pattern: '^dumb-' } } }",
+            Some(&meta)
+        ));
+    }
+
+    #[test]
+    fn all_none_and_first() {
         let meta = overlay(&[("roles", list(&["heating", "smart-thermostat"]))]);
         assert!(matches(
-            "meta:\n  annotations:\n    roles: smart-thermostat\n",
+            "{ roles: { all: { pattern: '^(heating|smart-)' } } }",
             Some(&meta)
         ));
-        assert!(matches(
-            "meta:\n  annotations:\n    roles: heating\n",
-            Some(&meta)
-        ));
+        assert!(!matches("{ roles: { all: heating } }", Some(&meta)));
+        assert!(matches("{ roles: { none: lighting } }", Some(&meta)));
+        assert!(!matches("{ roles: { none: heating } }", Some(&meta)));
+        assert!(matches("{ roles: { first: heating } }", Some(&meta)));
         assert!(!matches(
-            "meta:\n  annotations:\n    roles: lighting\n",
-            Some(&meta)
-        ));
-        assert!(matches(
-            "meta:\n  annotations:\n    roles:\n      operator: includesAny\n      value: [lighting, heating]\n",
-            Some(&meta)
-        ));
-        assert!(matches(
-            "meta:\n  annotations:\n    roles:\n      pattern: '^smart-'\n",
+            "{ roles: { first: smart-thermostat } }",
             Some(&meta)
         ));
     }
 
     #[test]
-    fn negative_operators_require_every_list_element() {
-        let meta = overlay(&[("roles", list(&["heating", "smart-thermostat"]))]);
-        assert!(!matches(
-            "meta:\n  annotations:\n    roles:\n      operator: includesNone\n      value: [heating]\n",
-            Some(&meta)
-        ));
-        assert!(matches(
-            "meta:\n  annotations:\n    roles:\n      operator: includesNone\n      value: [lighting]\n",
-            Some(&meta)
-        ));
-        assert!(!matches(
-            "meta:\n  annotations:\n    roles:\n      operator: \"<>\"\n      value: heating\n",
-            Some(&meta)
-        ));
+    fn empty_true_and_false() {
+        let meta = overlay(&[("roles", list(&["heating"])), ("tags", list(&[]))]);
+        assert!(matches("{ roles: { empty: false } }", Some(&meta)));
+        assert!(!matches("{ roles: { empty: true } }", Some(&meta)));
+        assert!(matches("{ tags: { empty: true } }", Some(&meta)));
+        assert!(!matches("{ tags: { empty: false } }", Some(&meta)));
     }
 
     #[test]
-    fn scalar_annotation_is_a_one_element_list() {
+    fn scalar_annotation_is_a_one_element_list_of_strings() {
+        let meta = overlay(&[("room", text("bathroom")), ("heating", text("true"))]);
+        assert!(matches("{ room: { any: bathroom } }", Some(&meta)));
+        assert!(matches("{ room: { first: bathroom } }", Some(&meta)));
+        assert!(matches("{ room: { all: bathroom } }", Some(&meta)));
+        assert!(!matches("{ room: { any: kitchen } }", Some(&meta)));
+        // Annotation values are strings: compare with "true".
+        assert!(matches("{ heating: { any: \"true\" } }", Some(&meta)));
+    }
+
+    #[test]
+    fn missing_annotation_is_an_empty_list() {
         let meta = overlay(&[("room", text("bathroom"))]);
-        assert!(matches(
-            "meta:\n  annotations:\n    room: bathroom\n",
-            Some(&meta)
-        ));
-        assert!(!matches(
-            "meta:\n  annotations:\n    room: kitchen\n",
-            Some(&meta)
-        ));
-        assert!(matches(
-            "meta:\n  annotations:\n    room:\n      first: bathroom\n",
-            Some(&meta)
-        ));
-    }
-
-    #[test]
-    fn missing_annotation_does_not_match_except_absence_operators() {
-        let meta = overlay(&[("room", text("bathroom"))]);
-        for meta in [Some(&meta), None] {
-            assert!(!matches("meta:\n  annotations:\n    floor: first\n", meta));
-            assert!(!matches(
-                "meta:\n  annotations:\n    floor:\n      operator: exists\n",
-                meta
-            ));
-            assert!(!matches(
-                "meta:\n  annotations:\n    floor:\n      operator: includesNone\n      value: [x]\n",
-                meta
-            ));
-            assert!(!matches(
-                "meta:\n  annotations:\n    floor:\n      first: first\n",
-                meta
-            ));
-            assert!(matches(
-                "meta:\n  annotations:\n    floor:\n      operator: isEmpty\n",
-                meta
-            ));
-            assert!(matches(
-                "meta:\n  annotations:\n    floor:\n      operator: matchAlways\n",
-                meta
-            ));
-        }
-        let empty = overlay(&[("floor", list(&[]))]);
-        assert!(!matches(
-            "meta:\n  annotations:\n    floor:\n      operator: exists\n",
-            Some(&empty)
-        ));
-        assert!(matches(
-            "meta:\n  annotations:\n    floor:\n      operator: isEmpty\n",
-            Some(&empty)
-        ));
-        // An overlay without a device level has no annotations.
         let bare = MetaDeviceOverlay {
             schema: 2,
             device: None,
         };
-        assert!(!matches(
-            "meta:\n  annotations:\n    room: bathroom\n",
-            Some(&bare)
-        ));
+        for meta in [Some(&meta), Some(&bare), None] {
+            assert!(!matches("{ floor: { any: first } }", meta));
+            assert!(!matches("{ floor: { first: first } }", meta));
+            assert!(matches("{ floor: { all: first } }", meta));
+            assert!(matches("{ floor: { none: first } }", meta));
+            assert!(matches("{ floor: { empty: true } }", meta));
+            assert!(!matches("{ floor: { empty: false } }", meta));
+        }
     }
 
     #[test]
-    fn first_matches_only_the_first_list_element() {
-        let meta = overlay(&[("rooms", list(&["bathroom", "hall"]))]);
-        assert!(matches(
-            "meta:\n  annotations:\n    rooms:\n      first: bathroom\n",
-            Some(&meta)
-        ));
-        assert!(!matches(
-            "meta:\n  annotations:\n    rooms:\n      first: hall\n",
-            Some(&meta)
-        ));
-        assert!(matches(
-            "meta:\n  annotations:\n    rooms:\n      first:\n        operator: \"=\"\n        value: [kitchen, bathroom]\n",
-            Some(&meta)
-        ));
-    }
-
-    #[test]
-    fn all_annotations_and_other_conditions_must_match() {
+    fn all_annotations_and_other_sections_must_match() {
         let meta = overlay(&[
             ("room", text("bathroom")),
             ("roles", list(&["smart-thermostat"])),
         ]);
-        assert!(matches(
-            "meta:\n  annotations:\n    room: bathroom\n    roles: smart-thermostat\nnode:\n  type: thermostat\n",
-            Some(&meta)
-        ));
-        assert!(!matches(
-            "meta:\n  annotations:\n    room: bathroom\n    roles: lighting\n",
-            Some(&meta)
-        ));
-        assert!(!matches(
-            "meta:\n  annotations:\n    room: bathroom\nnode:\n  type: switch\n",
-            Some(&meta)
-        ));
+        let query = |yaml: &str| serde_yaml_ng::from_str::<QueryDefinition>(yaml).unwrap();
+        let run = |q: QueryDefinition| {
+            !q.match_query(
+                &HomieDomain::Default,
+                &HomieID::new_const("dev-1"),
+                &desc(),
+                Some(&meta),
+            )
+            .is_empty()
+        };
+        assert!(run(query(
+            "meta: { annotations: { room: { any: bathroom }, roles: { any: smart-thermostat } } }\nnode: { type: thermostat }\n"
+        )));
+        assert!(!run(query(
+            "meta: { annotations: { room: { any: bathroom }, roles: { any: lighting } } }\n"
+        )));
+        assert!(!run(query(
+            "meta: { annotations: { room: { any: bathroom } } }\nnode: { type: switch }\n"
+        )));
         // An empty meta query matches regardless of the overlay.
-        assert!(matches("meta: {}\n", None));
+        assert!(matches("{}", None));
     }
 
     #[test]
@@ -478,7 +462,8 @@ mod meta {
             .into_iter()
             .collect();
         let query: QueryDefinition =
-            serde_yaml_ng::from_str("meta:\n  annotations:\n    room: bathroom\n").unwrap();
+            serde_yaml_ng::from_str("meta:\n  annotations:\n    room: { any: bathroom }\n")
+                .unwrap();
         let refs = query.match_query(
             &HomieDomain::Default,
             &HomieID::new_const("dev-1"),
@@ -488,17 +473,19 @@ mod meta {
         assert_eq!(refs.len(), 1);
     }
 
-    const TREE_QUERY: &str = r#"
+    const QUERY: &str = r#"
 domain: homie
 device:
   id:
     operator: "<>"
     value: other
+  extensions: { empty: true }
 meta:
   annotations:
     roles:
-      operator: includesAny
-      value: [smart-thermostat]
+      any:
+        operator: includesAny
+        value: [smart-thermostat]
     room:
       first:
         operator: "="
@@ -515,8 +502,8 @@ property:
             ("room", list(&["bathroom", "x"])),
             ("roles", list(&["smart-thermostat"])),
         ]);
-        let from_text: QueryDefinition = serde_yaml_ng::from_str(TREE_QUERY).unwrap();
-        let tree: serde_yaml_ng::Value = serde_yaml_ng::from_str(TREE_QUERY).unwrap();
+        let from_text: QueryDefinition = serde_yaml_ng::from_str(QUERY).unwrap();
+        let tree: serde_yaml_ng::Value = serde_yaml_ng::from_str(QUERY).unwrap();
         let from_tree: QueryDefinition = serde_yaml_ng::from_value(tree).unwrap();
         let expected = vec![PropertyRef::new(
             HomieDomain::Default,
@@ -543,18 +530,26 @@ property:
     }
 
     #[test]
-    fn meta_query_rejects_unknown_fields() {
-        assert!(
-            serde_yaml_ng::from_str::<QueryDefinition>("meta:\n  annotation:\n    room: x\n")
-                .is_err()
-        );
-        assert!(serde_yaml_ng::from_str::<MetaCondition>("first: x\nlast: y\n").is_err());
+    fn meta_query_rejects_unknown_fields_and_bare_conditions() {
+        assert!(serde_yaml_ng::from_str::<QueryDefinition>(
+            "meta:\n  annotation:\n    room: { any: x }\n"
+        )
+        .is_err());
+        assert!(serde_yaml_ng::from_str::<QueryDefinition>(
+            "meta:\n  annotations:\n    room: bathroom\n"
+        )
+        .is_err());
+        assert!(serde_yaml_ng::from_str::<QueryDefinition>(
+            "meta:\n  annotations:\n    room: { operator: \"=\", value: x }\n"
+        )
+        .is_err());
     }
 
     #[test]
     fn materialized_query_follows_meta_and_removes_by_device() {
         let mut query: MaterializedQuery =
-            serde_yaml_ng::from_str("meta:\n  annotations:\n    room: bathroom\n").unwrap();
+            serde_yaml_ng::from_str("meta:\n  annotations:\n    room: { any: bathroom }\n")
+                .unwrap();
         let id = HomieID::new_const("dev-1");
         let prop = PropertyRef::new(
             HomieDomain::Default,

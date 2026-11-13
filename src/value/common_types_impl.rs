@@ -1,7 +1,5 @@
 use homie5::{HomieDataType, HomieDomain, HomieID, HomieValue};
 
-use crate::impl_value_matcher_for_vec;
-
 use super::ValueMatcher;
 
 // Implement ValueMatcher for Common and Homie Types
@@ -26,9 +24,6 @@ impl ValueMatcher for HomieID {
         self.as_str()
     }
 }
-
-// impl_value_matcher_for!(HomieID);
-impl_value_matcher_for_vec!(HomieID);
 
 impl ValueMatcher for HomieDataType {
     fn as_match_str(&self) -> &str {
@@ -71,5 +66,3 @@ impl ValueMatcher for HomieDomain {
         false
     }
 }
-
-impl_value_matcher_for_vec!(String);

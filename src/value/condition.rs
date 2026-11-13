@@ -89,16 +89,27 @@ where
 // --- Condition Operators, extended with pattern matching variants ---
 #[derive(Debug, Clone, Copy, PartialEq, Eq, JsonSchema)]
 pub enum ConditionOperator {
+    /// `=`: equals the operand; with a list operand, equals one of its values.
     Equal,
+    /// `>`
     Greater,
+    /// `<`
     Less,
+    /// `>=`
     GreaterOrEqual,
+    /// `<=`
     LessOrEqual,
+    /// `<>`: differs from the operand; with a list operand, equals none of its values.
     NotEqual,
+    /// `includesAny`: the value is one of the operand values (same as `=` with a list).
     IncludesAny,
+    /// `includesNone`: the value is none of the operand values (same as `<>` with a list).
     IncludesNone,
+    /// `matchAlways`: always matches.
     MatchAlways,
+    /// `isEmpty`: matches only a missing value.
     IsEmpty,
+    /// `exists`: matches any present value.
     Exists,
     /// Inclusive range: the operand is a list of exactly two values `[min, max]`.
     Between,

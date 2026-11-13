@@ -1,4 +1,22 @@
-use crate::value::{ConditionOperator, ValueCondition};
+//! Declarative device/node/property queries.
+//!
+//! A [`QueryDefinition`] combines optional `domain`, `device`, `node`, `property` and `meta`
+//! sections; every present section must match. Scalar fields take a
+//! [`ValueCondition`]; list fields (`device.children`, `device.extensions`, and each `$meta`
+//! annotation in `meta.annotations`) take a [`ListCondition`] with an explicit quantifier.
+//!
+//! ```yaml
+//! device:
+//!   extensions: { any: { pattern: "^org\\.homie\\.meta:" } }
+//!   children: { empty: true }
+//! node:
+//!   type: thermostat
+//! meta:
+//!   annotations:
+//!     roles: { any: smart-thermostat }
+//! ```
+
+use crate::value::{ListCondition, ValueCondition};
 use homie5::{
     device_description::{
         HomieDeviceDescription, HomieNodeDescription, HomiePropertyDescription, HomiePropertyFormat,
@@ -84,10 +102,12 @@ pub struct DeviceQuery {
     pub name: Option<ValueCondition<String>>,
     pub version: Option<ValueCondition<i64>>,
     pub homie: Option<ValueCondition<String>>,
-    pub children: Option<ValueCondition<Vec<HomieID>>>,
+    /// Child device IDs, matched as a list (`any:`, `all:`, `none:`, `first:`, `empty:`).
+    pub children: Option<ListCondition<HomieID>>,
     pub root: Option<ValueCondition<HomieID>>,
     pub parent: Option<ValueCondition<HomieID>>,
-    pub extensions: Option<ValueCondition<Vec<String>>>,
+    /// Extension identifiers, matched as a list (`any:`, `all:`, `none:`, `first:`, `empty:`).
+    pub extensions: Option<ListCondition<String>>,
 }
 
 impl DeviceQuery {
@@ -159,68 +179,31 @@ impl MetaAnnotations for homie5::extensions::meta::MetaDeviceOverlay {
     }
 }
 
-/// Condition on one `$meta` annotation.
-///
-/// - A plain [`ValueCondition`] matches if any annotation value matches (a scalar annotation is a
-///   one-element list). `<>` and `includesNone` are the negation of `=` and `includesAny` over the
-///   list, so they require every value to match.
-/// - `first: <condition>` matches the first value only.
-///
-/// A missing annotation, or an empty list, counts as no value: only `isEmpty` and `matchAlways`
-/// match it.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
-#[serde(untagged)]
-pub enum MetaCondition {
-    First(MetaFirstCondition),
-    Any(ValueCondition<String>),
-}
-
-/// The `first:` form of a [`MetaCondition`].
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MetaFirstCondition {
-    pub first: ValueCondition<String>,
-}
-
-impl MetaCondition {
-    /// Evaluates the condition against an annotation's values (`None` when it is absent).
-    pub fn evaluate(&self, values: Option<&[String]>) -> bool {
-        let values = values.filter(|values| !values.is_empty());
-        match self {
-            MetaCondition::First(cond) => cond
-                .first
-                .evaluate_option(values.and_then(|values| values.first())),
-            MetaCondition::Any(cond) => match values {
-                None => cond.evaluate_option(None),
-                Some(values) if is_negation(cond) => {
-                    values.iter().all(|value| cond.evaluate(value))
-                }
-                Some(values) => values.iter().any(|value| cond.evaluate(value)),
-            },
-        }
-    }
-}
-
-fn is_negation(cond: &ValueCondition<String>) -> bool {
-    matches!(
-        cond,
-        ValueCondition::Operator(op) if matches!(op.operator, ConditionOperator::NotEqual | ConditionOperator::IncludesNone)
-    )
-}
-
 /// Selects devices by their device-level `$meta` annotations; every listed annotation must match.
+///
+/// Each annotation is matched as a list of strings with a [`ListCondition`]: a scalar annotation
+/// is a one-element list, a missing annotation an empty one. Annotation values are always strings,
+/// so compare with `"true"`, not `true`.
+///
+/// ```yaml
+/// meta:
+///   annotations:
+///     roles: { any: smart-thermostat }
+///     room: { first: { operator: "=", value: [bathroom, hall] } }
+///     heating: { any: "true" }
+/// ```
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MetaQuery {
     #[serde(default)]
-    pub annotations: BTreeMap<String, MetaCondition>,
+    pub annotations: BTreeMap<String, ListCondition<String>>,
 }
 
 impl MetaQuery {
     pub fn match_query(&self, meta: Option<&dyn MetaAnnotations>) -> bool {
-        self.annotations
-            .iter()
-            .all(|(key, cond)| cond.evaluate(meta.and_then(|meta| meta.device_annotation(key))))
+        self.annotations.iter().all(|(key, cond)| {
+            cond.evaluate_option(meta.and_then(|meta| meta.device_annotation(key)))
+        })
     }
 }
 

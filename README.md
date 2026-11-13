@@ -21,8 +21,8 @@ The public API is organized into domain-oriented submodules:
 |--------|---------|-------------|
 | `store` | base | `DeviceStore`, `PropertyValueStore`, `AlertStore` — in-memory state |
 | `model` | base | `Device`, `PropertyValueEntry`, `DiscoveryAction` — data types |
-| `query` | base | `QueryDefinition`, `MaterializedQuery` — property filtering |
-| `value` | base | `ValueCondition`, `ConditionTree` (all/any/not), `ValueMapping`, `ValueMappingIO` — matching/mapping |
+| `query` | base | `QueryDefinition`, `MaterializedQuery`, `MetaQuery`, `MetaAnnotations` — property filtering, incl. `$meta` annotations |
+| `value` | base | `ValueCondition`, `ListCondition` (any/all/none/first/empty), `ConditionTree` (all/any/not), `ValueMapping`, `ValueMappingIO` — matching/mapping |
 | `connection` | base | `ConnectionState`, `ConnectionEvent` — connection lifecycle FSM |
 | `alerts` | base | `AlertSpec`, `AlertEngine`, `AlertState` — alert engine |
 | `util` | base | `UniqueByIter` and other helpers |
@@ -126,6 +126,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+```
+
+## Queries and conditions
+
+`QueryDefinition` (YAML) selects properties by `domain`, `device`, `node`, `property` and `meta`;
+every present section must match. Queries deserialize from YAML text and from parsed
+`serde_yaml_ng::Value` trees alike.
+
+- Scalar fields take a `ValueCondition`: a literal (`thermostat`), `{ pattern: "^re" }`, or
+  `{ operator: <op>, value: <v | [v, ...]> }` with `=`, `<>`, `>`, `<`, `>=`, `<=`, `between`,
+  `includesAny` / `includesNone` ("is one of" / "is none of" a value list), `exists`, `isEmpty`,
+  `matchAlways`.
+- List fields take a `ListCondition`, a mapping with exactly one quantifier key; bare value
+  conditions are rejected:
+
+  | Form | Holds when | Empty or missing list |
+  |------|------------|-----------------------|
+  | `any: <cond>` | at least one element matches | no |
+  | `all: <cond>` | every element matches | yes |
+  | `none: <cond>` | no element matches | yes |
+  | `first: <cond>` | the first element matches | no |
+  | `empty: true` / `empty: false` | the list is empty / not empty | `true` / `false` |
+
+  List fields are `device.children`, `device.extensions` and each `$meta` annotation in
+  `meta.annotations`.
+- `meta.annotations` matches device-level `$meta` annotations. A scalar annotation is a
+  one-element list, a missing annotation an empty list. Annotation values are always strings,
+  so compare with `"true"`, not `true`. Pass the device's merged overlay
+  (`Device::merged_meta_overlay()`, feature `ext-meta`) to `match_query` / `add_materialized`;
+  with `None` every annotation counts as missing.
+
+```yaml
+device:
+  extensions: { any: { pattern: "^org\\.homie\\.meta:" } }
+node:
+  type: thermostat
+meta:
+  annotations:
+    roles: { any: smart-thermostat }
+    room: { first: { operator: "=", value: [bathroom, hall] } }
+    heating: { any: "true" }
 ```
 
 ## Environment variables
