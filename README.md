@@ -51,7 +51,7 @@ Use minimal features when needed, for example:
 
 ```toml
 [dependencies]
-hc-homie5 = { version = "0.18", default-features = false, features = ["base"] }
+hc-homie5 = { version = "0.19", default-features = false, features = ["base"] }
 ```
 
 ## Quick start
@@ -60,7 +60,7 @@ hc-homie5 = { version = "0.18", default-features = false, features = ["base"] }
 
 ```toml
 [dependencies]
-hc-homie5 = "0.18"
+hc-homie5 = "0.19"
 homie5 = "0.13"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
@@ -156,6 +156,45 @@ every present section must match. Queries deserialize from YAML text and from pa
   so compare with `"true"`, not `true`. Pass the device itself (`Some(&device)`, feature
   `ext-meta`; it reads the cached merged overlay) or any other `MetaAnnotations` source to
   `match_query` / `add_materialized`; with `None` every annotation counts as missing.
+
+## Config templates (`template`)
+
+The `template` module expands parsed `serde_yaml_ng::Value` trees before they are deserialized
+into typed config. It knows nothing about Homie: apps supply device data through an
+`ExpandContext` (query results, globals, scope variables) and register functions on the
+minijinja environment (`Engine::env_mut()`).
+
+```yaml
+# heating-card.tpl.yaml
+template: heating-card
+params: [item, title]
+defaults: { title: "{{ item.name }}" }
+body:
+  type: card
+  title: "{{ title }}"
+  device: "{{ item.id }}"
+```
+
+```yaml
+cards:
+  - for_each: { query: { node: { type: thermostat } }, sort_by: meta.room }
+    use: heating-card
+  - for_each: { items: [thermo-office, thermo-bath] }   # or items: "{{ expr }}"
+    item: { type: value, device: "{{ item }}" }
+  - when: "show_extra"
+    use: extra-card
+    with: { title: Extra }
+```
+
+- `{{ expr }}` in any scalar; a string that is exactly one placeholder yields a typed value.
+- `use:`/`with:` replaces a mapping by a template body; a list body is spliced into a list.
+- `for_each` takes `query:` (device query through the context) or `items:` (literal list or one
+  expression returning a list); the element is `item`; optional `sort_by` field path.
+- `when:` keeps a list item only if the expression is truthy.
+- `check()` reports unknown templates, parameter errors, syntax and recursion at load time;
+  `expand()` / `expand_documents()` (root `for_each`) produce the final tree.
+
+See the module documentation of `hc_homie5::template` for scopes, ordering and limits.
 
 ## Device meta overlays (`ext-meta`)
 

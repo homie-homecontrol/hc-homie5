@@ -665,3 +665,239 @@ cards:
     );
     assert_eq!(expand(&page, &reg, &ctx).unwrap(), expected);
 }
+
+// ── for_each over lists (HC-281) ─────────────────────────────────────────
+
+fn globals(pairs: &str) -> Fake {
+    let mut ctx = Fake::new(DEVICES);
+    if let Value::Mapping(m) = yaml(pairs) {
+        ctx.globals = m;
+    }
+    ctx
+}
+
+#[test]
+fn for_each_items_literal_list_with_inline_item() {
+    let ctx = globals("{ a: thermo-a, b: 2 }");
+    let doc = yaml(
+        r#"
+scalars:
+  - head
+  - { for_each: { items: [x, 1, true] }, item: "v-{{ item }}" }
+maps:
+  - for_each: { items: [{ id: one, n: 1 }, { id: two, n: 2 }] }
+    item: { id: "{{ item.id }}", next: "{{ item.n + 1 }}" }
+evaluated:
+  - for_each: { items: ["{{ a }}", { id: "{{ b }}" }] }
+    item: { value: "{{ item }}" }
+"#,
+    );
+    assert_eq!(
+        expand(&doc, &TemplateRegistry::new(), &ctx).unwrap(),
+        yaml(
+            r#"
+scalars: [head, v-x, v-1, v-True]  # minijinja prints bools Python-style in text
+maps: [{ id: one, next: 2 }, { id: two, next: 3 }]
+evaluated: [{ value: thermo-a }, { value: { id: 2 } }]
+"#
+        )
+    );
+}
+
+#[test]
+fn for_each_items_expression_sees_params_and_app_functions() {
+    let reg = registry(&[r#"
+template: picked
+params: [ids]
+body:
+  - for_each: { items: "{{ ids }}" }
+    item: { device: "{{ item }}" }
+"#]);
+    let ctx = Fake::new(DEVICES);
+    let out = expand(
+        &yaml("{ use: picked, with: { ids: [thermo-b, lamp-1] } }"),
+        &reg,
+        &ctx,
+    )
+    .unwrap();
+    assert_eq!(out, yaml("[{ device: thermo-b }, { device: lamp-1 }]"));
+
+    // An app function returning a list.
+    let engine = Engine::new().with_env(|env| {
+        env.add_function("pick", |n: i64| -> MjValue {
+            MjValue::from((1..=n).collect::<Vec<i64>>())
+        });
+    });
+    let doc = yaml("- { for_each: { items: \"{{ pick(3) }}\" }, item: \"{{ item * 10 }}\" }");
+    assert_eq!(
+        engine.expand(&doc, &TemplateRegistry::new(), &ctx).unwrap(),
+        yaml("[10, 20, 30]")
+    );
+}
+
+#[test]
+fn for_each_items_expression_must_be_a_list() {
+    let ctx = globals("{ n: 5, nothing: null }");
+    let reg = TemplateRegistry::new();
+    for (items, kind) in [
+        ("\"{{ n }}\"", TemplateErrorKind::Evaluation),
+        ("\"{{ nothing }}\"", TemplateErrorKind::Evaluation),
+        ("\"ids: {{ n }}\"", TemplateErrorKind::Malformed),
+        ("plain", TemplateErrorKind::Malformed),
+        ("{ a: 1 }", TemplateErrorKind::Malformed),
+        ("\"{{ missing }}\"", TemplateErrorKind::Evaluation),
+    ] {
+        let doc = yaml(&format!(
+            "cards: [x, {{ for_each: {{ items: {items} }}, item: 1 }}]"
+        ));
+        let err = expand(&doc, &reg, &ctx).unwrap_err();
+        assert_eq!(err.kind, kind, "{items}: {err}");
+        assert_eq!(err.path.to_string(), "cards[1].for_each.items", "{items}");
+    }
+    // Exactly one of query / items.
+    for spec in ["{ query: {}, items: [] }", "{ sort_by: id }"] {
+        let doc = yaml(&format!("- {{ for_each: {spec}, item: 1 }}"));
+        let err = expand(&doc, &reg, &ctx).unwrap_err();
+        assert_eq!(err.kind, TemplateErrorKind::Malformed, "{spec}");
+        assert_eq!(err.path.to_string(), "[0].for_each");
+    }
+}
+
+#[test]
+fn for_each_items_keep_list_order_unless_sorted() {
+    let ctx = Fake::new("[]");
+    let list = "[{ id: c, name: B }, { id: a }, { id: b, name: A }, { id: d, name: B }]";
+    let doc = yaml(&format!(
+        "plain: [{{ for_each: {{ items: {list} }}, item: '{{{{ item.id }}}}' }}]\n\
+         sorted: [{{ for_each: {{ items: {list}, sort_by: name }}, item: '{{{{ item.id }}}}' }}]"
+    ));
+    // Unsorted: list order. Sorted: by name, ties keep list order (c before d), missing last.
+    assert_eq!(
+        expand(&doc, &TemplateRegistry::new(), &ctx).unwrap(),
+        yaml("{ plain: [c, a, b, d], sorted: [b, c, d, a] }")
+    );
+}
+
+#[test]
+fn for_each_items_with_use_and_with() {
+    let reg = registry(&[
+        "{ template: row, params: [item, title], defaults: { title: '{{ item.name }}' }, body: { id: '{{ item.id }}', title: '{{ title }}' } }",
+    ]);
+    let ctx = Fake::new("[]");
+    let doc = yaml(
+        r#"
+- for_each: { items: [{ id: a, name: Alpha }, { id: b, name: Beta }] }
+  use: row
+- for_each: { items: [{ id: c, name: Gamma }] }
+  use: row
+  with: { title: "Fixed {{ item.name }}" }
+"#,
+    );
+    assert_eq!(
+        expand(&doc, &reg, &ctx).unwrap(),
+        yaml("[{ id: a, title: Alpha }, { id: b, title: Beta }, { id: c, title: Fixed Gamma }]")
+    );
+}
+
+#[test]
+fn nested_for_each_inner_item_shadows_outer() {
+    let ctx = Fake::new("[]");
+    let doc = yaml(
+        r#"
+- for_each: { items: [{ name: A, kids: [1, 2] }, { name: B, kids: [3] }] }
+  item:
+    group: "{{ item.name }}"
+    kids:
+      - for_each: { items: "{{ item.kids }}" }
+        item: "{{ item * 100 }}"
+    after: "{{ item.name }}"
+"#,
+    );
+    assert_eq!(
+        expand(&doc, &TemplateRegistry::new(), &ctx).unwrap(),
+        yaml(
+            r#"
+- { group: A, kids: [100, 200], after: A }
+- { group: B, kids: [300], after: B }
+"#
+        )
+    );
+}
+
+#[test]
+fn root_for_each_items_yields_documents() {
+    let ctx = Fake::new("[]");
+    let doc = yaml(
+        r#"
+for_each: { items: [office, bath] }
+item: { id: "virtual-{{ item }}" }
+"#,
+    );
+    let docs = expand_documents(&doc, &TemplateRegistry::new(), &ctx).unwrap();
+    assert_eq!(
+        docs,
+        vec![yaml("{ id: virtual-office }"), yaml("{ id: virtual-bath }")]
+    );
+}
+
+#[test]
+fn default_filter_and_is_defined_work_for_missing_keys() {
+    let ctx = Fake::new("[]");
+    let doc = yaml(
+        r#"
+- for_each: { items: [{ id: a, label: Alpha }, { id: b }] }
+  item:
+    label: "{{ item.label | default(item.id) }}"
+    has_label: "{{ item.label is defined }}"
+    text: "{{ item.id }}: {{ item.label | default('none') }}"
+"#,
+    );
+    assert_eq!(
+        expand(&doc, &TemplateRegistry::new(), &ctx).unwrap(),
+        yaml(
+            r#"
+- { label: Alpha, has_label: true, text: "a: Alpha" }
+- { label: b, has_label: false, text: "b: none" }
+"#
+        )
+    );
+}
+
+#[test]
+fn check_validates_for_each_items() {
+    let reg = TemplateRegistry::new();
+    let doc = yaml(
+        r#"
+- { for_each: { query: {}, items: [] }, item: 1 }
+- { for_each: { sort_by: id }, item: 1 }
+- { for_each: { items: { a: 1 } }, item: 1 }
+- { for_each: { items: "plain text" }, item: 1 }
+- { for_each: { items: "{{ 1 + }}" }, item: 1 }
+- { for_each: { items: ["{{ ok }}", "{{ 2 * }}"] }, item: 1 }
+- { for_each: { items: [a, b], sort_by: name }, item: "{{ item }}" }
+- { for_each: { items: "{{ ids }}" }, item: "{{ item }}" }
+"#,
+    );
+    let found: Vec<(TemplateErrorKind, String)> = check(&doc, &reg)
+        .iter()
+        .map(|e| (e.kind, e.path.to_string()))
+        .collect();
+    let expected = vec![
+        (TemplateErrorKind::Malformed, "[0].for_each".to_owned()),
+        (TemplateErrorKind::Malformed, "[1].for_each".to_owned()),
+        (
+            TemplateErrorKind::Malformed,
+            "[2].for_each.items".to_owned(),
+        ),
+        (
+            TemplateErrorKind::Malformed,
+            "[3].for_each.items".to_owned(),
+        ),
+        (TemplateErrorKind::Syntax, "[4].for_each.items".to_owned()),
+        (
+            TemplateErrorKind::Syntax,
+            "[5].for_each.items[1]".to_owned(),
+        ),
+    ];
+    assert_eq!(found, expected);
+}

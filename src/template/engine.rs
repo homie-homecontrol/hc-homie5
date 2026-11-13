@@ -263,7 +263,8 @@ struct Expander<'e> {
 const USE_KEYS: &[&str] = &["use", "with"];
 const FOR_EACH_USE_KEYS: &[&str] = &["for_each", "use", "with"];
 const FOR_EACH_ITEM_KEYS: &[&str] = &["for_each", "item"];
-const FOR_EACH_SPEC_KEYS: &[&str] = &["query", "sort_by"];
+const FOR_EACH_SPEC_KEYS: &[&str] = &["query", "items", "sort_by"];
+const FOR_EACH_SPEC_NEEDS: &str = "`for_each` needs exactly one of `query` or `items`";
 
 impl<'e> Expander<'e> {
     fn new(
@@ -670,6 +671,42 @@ impl<'e> Expander<'e> {
         self.path.pop();
     }
 
+    /// The elements of `for_each.items`: a literal list (expanded in the current scope like any
+    /// other value) or one `{{ expr }}` that evaluates to a list.
+    fn list_items(&mut self, items: &Value) -> Result<Vec<Value>, TemplateError> {
+        let expanded = match items {
+            Value::Sequence(_) => self.value(items)?,
+            Value::String(s) => match parse_scalar(s).map_err(|m| self.err(Kind::Syntax, m))? {
+                Scalar::Single(expr) => self.to_yaml(&self.eval(expr)?)?,
+                _ => {
+                    return Err(self.err(
+                        Kind::Malformed,
+                        "`items` must be a list or a single `{{ expr }}` returning a list",
+                    ))
+                }
+            },
+            _ => {
+                return Err(self.err(
+                    Kind::Malformed,
+                    "`items` must be a list or a single `{{ expr }}` returning a list",
+                ))
+            }
+        };
+        match expanded {
+            Value::Sequence(items) => Ok(items),
+            Value::Null => Err(self.err(Kind::Evaluation, "`items` evaluated to none, not a list")),
+            other => Err(self.err(
+                Kind::Evaluation,
+                format!(
+                    "`items` must evaluate to a list, got {}",
+                    serde_yaml_ng::to_string(&other)
+                        .map(|s| s.trim().to_owned())
+                        .unwrap_or_default()
+                ),
+            )),
+        }
+    }
+
     fn for_each(
         &mut self,
         m: &Mapping,
@@ -696,17 +733,12 @@ impl<'e> Expander<'e> {
             .get("for_each")
             .and_then(Value::as_mapping)
             .ok_or_else(|| {
-                self.err(Kind::Malformed, "`for_each` must be a mapping with `query`")
+                self.err(
+                    Kind::Malformed,
+                    "`for_each` must be a mapping with `query` or `items`",
+                )
             })?;
         self.check_keys(spec, FOR_EACH_SPEC_KEYS, false)?;
-        let query = spec
-            .get("query")
-            .ok_or_else(|| self.err(Kind::Malformed, "`for_each` needs a `query`"))?;
-        self.path.push(PathSegment::Key("query".into()));
-        let query = self.value(query)?;
-        let query: QueryDefinition = serde_yaml_ng::from_value(query)
-            .map_err(|e| self.err(Kind::Malformed, format!("invalid query: {e}")))?;
-        self.path.pop();
         let sort_by = match spec.get("sort_by") {
             None => None,
             Some(Value::String(s)) => Some(s.as_str()),
@@ -714,12 +746,32 @@ impl<'e> Expander<'e> {
                 return Err(self.err(Kind::Malformed, "`sort_by` must be a field path string"))
             }
         };
-        let mut items = self
-            .ctx
-            .query(&query)
-            .map_err(|e| self.err(Kind::Query, e))?;
+        let items = match (spec.get("query"), spec.get("items")) {
+            (Some(query), None) => {
+                self.path.push(PathSegment::Key("query".into()));
+                let query = self.value(query)?;
+                let query: QueryDefinition = serde_yaml_ng::from_value(query)
+                    .map_err(|e| self.err(Kind::Malformed, format!("invalid query: {e}")))?;
+                self.path.pop();
+                let mut items = self
+                    .ctx
+                    .query(&query)
+                    .map_err(|e| self.err(Kind::Query, e))?;
+                sort_query_elements(&mut items, sort_by);
+                items
+            }
+            (None, Some(items)) => {
+                self.path.push(PathSegment::Key("items".into()));
+                let mut items = self.list_items(items)?;
+                self.path.pop();
+                if let Some(sort_by) = sort_by {
+                    sort_list_elements(&mut items, sort_by);
+                }
+                items
+            }
+            _ => return Err(self.err(Kind::Malformed, FOR_EACH_SPEC_NEEDS)),
+        };
         self.path.pop();
-        sort_elements(&mut items, sort_by);
 
         for (index, element) in items.iter().enumerate() {
             self.path
@@ -790,7 +842,8 @@ fn compare_optional(a: Option<&Value>, b: Option<&Value>) -> Ordering {
     }
 }
 
-fn sort_elements(items: &mut [Value], sort_by: Option<&str>) {
+/// Query results: by `sort_by`, then by `id` (store order is not deterministic).
+fn sort_query_elements(items: &mut [Value], sort_by: Option<&str>) {
     items.sort_by(|a, b| {
         let by_field = match sort_by {
             Some(path) => compare_optional(field(a, path), field(b, path)),
@@ -800,10 +853,21 @@ fn sort_elements(items: &mut [Value], sort_by: Option<&str>) {
     });
 }
 
+/// `items` lists: by `sort_by`, ties keep list order (stable sort).
+fn sort_list_elements(items: &mut [Value], sort_by: &str) {
+    items.sort_by(|a, b| compare_optional(field(a, sort_by), field(b, sort_by)));
+}
+
+/// Path label of a `for_each` element: its `id` field, a scalar element itself, or its index.
 fn element_label(element: &Value, index: usize) -> String {
-    match element.as_mapping().and_then(|m| m.get("id")) {
+    let label = match element {
+        Value::Mapping(m) => m.get("id"),
+        scalar => Some(scalar),
+    };
+    match label {
         Some(Value::String(s)) => s.clone(),
         Some(Value::Number(n)) => n.to_string(),
+        Some(Value::Bool(b)) => b.to_string(),
         _ => index.to_string(),
     }
 }
@@ -1026,13 +1090,15 @@ impl Checker<'_> {
         self.keys(m, allowed, skip_when);
         self.with_key("for_each", |c| {
             let Some(spec) = m.get("for_each").and_then(Value::as_mapping) else {
-                c.report(Kind::Malformed, "`for_each` must be a mapping with `query`");
+                c.report(
+                    Kind::Malformed,
+                    "`for_each` must be a mapping with `query` or `items`",
+                );
                 return;
             };
             c.keys(spec, FOR_EACH_SPEC_KEYS, false);
-            match spec.get("query") {
-                None => c.report(Kind::Malformed, "`for_each` needs a `query`"),
-                Some(query) => c.with_key("query", |c| {
+            match (spec.get("query"), spec.get("items")) {
+                (Some(query), None) => c.with_key("query", |c| {
                     if has_placeholder(query) {
                         c.value(query);
                     } else if let Err(e) =
@@ -1041,6 +1107,22 @@ impl Checker<'_> {
                         c.report(Kind::Malformed, format!("invalid query: {e}"));
                     }
                 }),
+                (None, Some(items)) => c.with_key("items", |c| match items {
+                    Value::Sequence(_) => c.value(items),
+                    Value::String(s) => match parse_scalar(s) {
+                        Err(m) => c.report(Kind::Syntax, m),
+                        Ok(Scalar::Single(expr)) => c.expr(expr),
+                        Ok(_) => c.report(
+                            Kind::Malformed,
+                            "`items` must be a list or a single `{{ expr }}` returning a list",
+                        ),
+                    },
+                    _ => c.report(
+                        Kind::Malformed,
+                        "`items` must be a list or a single `{{ expr }}` returning a list",
+                    ),
+                }),
+                _ => c.report(Kind::Malformed, FOR_EACH_SPEC_NEEDS),
             }
             if spec.get("sort_by").is_some_and(|s| !s.is_string()) {
                 c.report(Kind::Malformed, "`sort_by` must be a field path string");
