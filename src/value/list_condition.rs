@@ -5,7 +5,7 @@
 //! ```yaml
 //! any: smart-thermostat                       # at least one element matches
 //! any: { operator: "=", value: [a, b] }       # at least one element is a or b
-//! all: { pattern: "^org\\.homie\\." }          # every element matches
+//! all: { pattern: "^org\\.homie\\." }          # the list is non-empty and every element matches
 //! none: legacy                                # no element matches
 //! first: bathroom                             # the first element matches
 //! empty: true                                 # the list is empty (false: not empty)
@@ -14,8 +14,11 @@
 //! Each form is a mapping with exactly one of these keys. A bare [`ValueCondition`] is not
 //! accepted: the quantifier is always explicit.
 //!
-//! Empty lists: `any` and `first` do not match, `all` and `none` match (vacuous truth).
+//! Empty lists: `any`, `all` and `first` do not match; `none` matches.
 //! [`ListCondition::evaluate_option`] treats a missing list as an empty one.
+//!
+//! Changed in 0.19.1: `all` used to hold on an empty list (vacuous truth). It is now false, so
+//! "every room is Büro" does not hold for a device without rooms.
 
 use std::fmt;
 use std::marker::PhantomData;
@@ -45,9 +48,10 @@ where
 {
     /// At least one element matches.
     Any(ValueCondition<T>),
-    /// Every element matches; holds for an empty list.
+    /// The list is non-empty and every element matches; never holds for an empty list
+    /// (until 0.19.0 it did).
     All(ValueCondition<T>),
-    /// No element matches; holds for an empty list.
+    /// No element matches; holds for an empty or missing list.
     None(ValueCondition<T>),
     /// The first element matches; never holds for an empty list.
     First(ValueCondition<T>),
@@ -63,7 +67,9 @@ where
     pub fn evaluate(&self, values: &[T]) -> bool {
         match self {
             ListCondition::Any(cond) => values.iter().any(|value| cond.evaluate(value)),
-            ListCondition::All(cond) => values.iter().all(|value| cond.evaluate(value)),
+            ListCondition::All(cond) => {
+                !values.is_empty() && values.iter().all(|value| cond.evaluate(value))
+            }
             ListCondition::None(cond) => !values.iter().any(|value| cond.evaluate(value)),
             ListCondition::First(cond) => values.first().is_some_and(|value| cond.evaluate(value)),
             ListCondition::Empty(empty) => values.is_empty() == *empty,
