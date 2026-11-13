@@ -1,4 +1,22 @@
-use crate::value::ValueCondition;
+//! Declarative device/node/property queries.
+//!
+//! A [`QueryDefinition`] combines optional `domain`, `device`, `node`, `property` and `meta`
+//! sections; every present section must match. Scalar fields take a
+//! [`ValueCondition`]; list fields (`device.children`, `device.extensions`, and each `$meta`
+//! annotation in `meta.annotations`) take a [`ListCondition`] with an explicit quantifier.
+//!
+//! ```yaml
+//! device:
+//!   extensions: { any: { pattern: "^org\\.homie\\.meta:" } }
+//!   children: { empty: true }
+//! node:
+//!   type: thermostat
+//! meta:
+//!   annotations:
+//!     roles: { any: smart-thermostat }
+//! ```
+
+use crate::value::{ListCondition, ValueCondition};
 use homie5::{
     device_description::{
         HomieDeviceDescription, HomieNodeDescription, HomiePropertyDescription, HomiePropertyFormat,
@@ -7,7 +25,7 @@ use homie5::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -84,10 +102,12 @@ pub struct DeviceQuery {
     pub name: Option<ValueCondition<String>>,
     pub version: Option<ValueCondition<i64>>,
     pub homie: Option<ValueCondition<String>>,
-    pub children: Option<ValueCondition<Vec<HomieID>>>,
+    /// Child device IDs, matched as a list (`any:`, `all:`, `none:`, `first:`, `empty:`).
+    pub children: Option<ListCondition<HomieID>>,
     pub root: Option<ValueCondition<HomieID>>,
     pub parent: Option<ValueCondition<HomieID>>,
-    pub extensions: Option<ValueCondition<Vec<String>>>,
+    /// Extension identifiers, matched as a list (`any:`, `all:`, `none:`, `first:`, `empty:`).
+    pub extensions: Option<ListCondition<String>>,
 }
 
 impl DeviceQuery {
@@ -125,6 +145,76 @@ impl DeviceQuery {
     }
 }
 
+/// Device-level `$meta` annotations a [`QueryDefinition`] can match against.
+///
+/// With the `ext-meta` feature it is implemented for [`Device`](crate::model::Device) (reads its
+/// cached merged overlay; the usual choice), for a single
+/// [`MetaDeviceOverlay`](homie5::extensions::meta::MetaDeviceOverlay) and for plain annotation
+/// maps ([`MetaEntries`](homie5::extensions::meta::MetaEntries)).
+pub trait MetaAnnotations {
+    /// Values of the device annotation `key`, or `None` when it is absent.
+    /// A scalar annotation is a one-element slice.
+    fn device_annotation(&self, key: &str) -> Option<&[String]>;
+}
+
+#[cfg(feature = "ext-meta")]
+impl MetaAnnotations for homie5::extensions::meta::MetaEntries {
+    fn device_annotation(&self, key: &str) -> Option<&[String]> {
+        use homie5::extensions::meta::MetaValue;
+        match self.get(key)? {
+            MetaValue::Text(value) => Some(std::slice::from_ref(value)),
+            MetaValue::List(values) => Some(values.as_slice()),
+        }
+    }
+}
+
+#[cfg(feature = "ext-meta")]
+impl MetaAnnotations for crate::model::Device {
+    /// Reads the cached merged overlay of all providers.
+    fn device_annotation(&self, key: &str) -> Option<&[String]> {
+        self.merged_meta_overlay().device_annotation(key)
+    }
+}
+
+#[cfg(feature = "ext-meta")]
+impl MetaAnnotations for homie5::extensions::meta::MetaDeviceOverlay {
+    fn device_annotation(&self, key: &str) -> Option<&[String]> {
+        self.device
+            .as_ref()?
+            .annotations
+            .as_ref()?
+            .device_annotation(key)
+    }
+}
+
+/// Selects devices by their device-level `$meta` annotations; every listed annotation must match.
+///
+/// Each annotation is matched as a list of strings with a [`ListCondition`]: a scalar annotation
+/// is a one-element list, a missing annotation an empty one. Annotation values are always strings,
+/// so compare with `"true"`, not `true`.
+///
+/// ```yaml
+/// meta:
+///   annotations:
+///     roles: { any: smart-thermostat }
+///     room: { first: { operator: "=", value: [bathroom, hall] } }
+///     heating: { any: "true" }
+/// ```
+#[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetaQuery {
+    #[serde(default)]
+    pub annotations: BTreeMap<String, ListCondition<String>>,
+}
+
+impl MetaQuery {
+    pub fn match_query(&self, meta: Option<&dyn MetaAnnotations>) -> bool {
+        self.annotations.iter().all(|(key, cond)| {
+            cond.evaluate_option(meta.and_then(|meta| meta.device_annotation(key)))
+        })
+    }
+}
+
 #[derive(Default, Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct QueryDefinition {
@@ -136,14 +226,23 @@ pub struct QueryDefinition {
     pub node: Option<NodeQuery>,
     #[serde(default)]
     pub property: Option<PropertyQuery>,
+    /// Device-level `$meta` annotation conditions, matched against the overlay passed to
+    /// [`QueryDefinition::match_query`].
+    #[serde(default)]
+    pub meta: Option<MetaQuery>,
 }
 
 impl QueryDefinition {
+    /// Returns every property of the device that matches the query.
+    ///
+    /// `meta` holds the device's `$meta` annotations; with `None` a query with `meta` conditions
+    /// sees every annotation as missing.
     pub fn match_query(
         &self,
         domain: &HomieDomain,
         id: &HomieID,
         device_desc: &HomieDeviceDescription,
+        meta: Option<&dyn MetaAnnotations>,
     ) -> Vec<PropertyRef> {
         let mut matched_properties = Vec::new();
 
@@ -159,6 +258,10 @@ impl QueryDefinition {
             .device
             .as_ref()
             .is_none_or(|device_query| device_query.match_query(id, device_desc))
+            && self
+                .meta
+                .as_ref()
+                .is_none_or(|meta_query| meta_query.match_query(meta))
         {
             // Iterate through all nodes and their properties
             for (node_id, node_desc) in &device_desc.nodes {
@@ -205,29 +308,38 @@ impl MaterializedQuery {
         }
     }
 
+    /// Re-evaluates the device and replaces its references; call it again when the device's
+    /// description or `$meta` overlay changes.
     pub fn add_materialized(
         &mut self,
         domain: &HomieDomain,
         id: &HomieID,
         device_desc: &HomieDeviceDescription,
+        meta: Option<&dyn MetaAnnotations>,
     ) {
         // Remove all refs belonging to the given device ID
         self.mat_refs.retain(|prop_ref| prop_ref.device_id() != id);
 
-        let new_refs = self.query.match_query(domain, id, device_desc);
+        let new_refs = self.query.match_query(domain, id, device_desc, meta);
         self.mat_refs.extend(new_refs); // Add new PropertyRefs to the HashSet
     }
 
+    /// Removes every reference of the device. `_device_desc` is unused and kept for compatibility:
+    /// removal no longer re-evaluates the query, so it does not depend on the overlay or
+    /// description that produced the match.
     pub fn remove_materialized(
         &mut self,
         domain: &HomieDomain,
         id: &HomieID,
-        device_desc: &HomieDeviceDescription,
+        _device_desc: &HomieDeviceDescription,
     ) {
-        let to_remove = self.query.match_query(domain, id, device_desc);
-        for prop_ref in to_remove {
-            self.mat_refs.remove(&prop_ref); // Remove matching PropertyRefs from the HashSet
-        }
+        self.mat_refs
+            .retain(|prop_ref| !(prop_ref.homie_domain() == domain && prop_ref.device_id() == id));
+    }
+
+    /// The underlying query definition.
+    pub fn query(&self) -> &QueryDefinition {
+        &self.query
     }
 
     pub fn match_query(&self, prop_ref: &PropertyRef) -> bool {

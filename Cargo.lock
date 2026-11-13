@@ -297,12 +297,13 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
 name = "hc-homie5"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "chrono",
  "hc-homie5-macros",
  "hc-homie5-smarthome",
  "homie5",
+ "minijinja",
  "paste",
  "rand",
  "regex",
@@ -482,6 +483,16 @@ name = "memchr"
 version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
+
+[[package]]
+name = "minijinja"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "509eeb2603a84eccabb4d75f6ec8ba23b46bbf441aaeb863d6b83a5887fd51e4"
+dependencies = [
+ "indexmap",
+ "serde",
+]
 
 [[package]]
 name = "mio"

@@ -106,7 +106,7 @@ impl MetaOverlayHandler {
                     device = %device_ref.device_id(),
                     "applying pending meta overlay"
                 );
-                device.meta_overlays.insert(provider_id, overlay);
+                device.set_meta_overlay(provider_id, overlay);
             }
         }
     }
@@ -129,7 +129,7 @@ impl MetaOverlayHandler {
 
         for device_ref in device_refs {
             if let Some(device) = devices.get_device_mut(&device_ref) {
-                device.meta_overlays.remove(provider_id);
+                device.remove_meta_overlay(provider_id);
             }
         }
     }
@@ -151,7 +151,7 @@ impl MetaOverlayHandler {
         let device_ref = DeviceRef::new(self.homie_domain.clone(), device_id.clone());
 
         if let Some(device) = devices.get_device_mut(&device_ref) {
-            device.meta_overlays.insert(provider_id, overlay);
+            device.set_meta_overlay(provider_id, overlay);
             return;
         }
 
@@ -171,7 +171,7 @@ impl MetaOverlayHandler {
         let device_ref = DeviceRef::new(self.homie_domain.clone(), device_id.clone());
 
         if let Some(device) = devices.get_device_mut(&device_ref) {
-            device.meta_overlays.remove(provider_id);
+            device.remove_meta_overlay(provider_id);
         }
 
         // Also remove from pending

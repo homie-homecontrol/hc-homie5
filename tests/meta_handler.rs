@@ -55,7 +55,7 @@ mod tests {
         // Overlay should be applied directly to device
         let device = store.get_device(&dref).unwrap();
         assert!(device
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-1")));
     }
 
@@ -86,7 +86,7 @@ mod tests {
         // Overlay should now be on the device
         let device = store.get_device(&dref).unwrap();
         assert!(device
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-1")));
     }
 
@@ -121,12 +121,12 @@ mod tests {
         assert!(store
             .get_device(&dref1)
             .unwrap()
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-1")));
         assert!(store
             .get_device(&dref2)
             .unwrap()
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-1")));
 
         // Remove provider
@@ -137,8 +137,8 @@ mod tests {
         handler.handle_meta_message(msg, &mut store);
 
         // Both devices should have no overlays
-        assert!(store.get_device(&dref1).unwrap().meta_overlays.is_empty());
-        assert!(store.get_device(&dref2).unwrap().meta_overlays.is_empty());
+        assert!(store.get_device(&dref1).unwrap().meta_overlays().is_empty());
+        assert!(store.get_device(&dref2).unwrap().meta_overlays().is_empty());
     }
 
     #[test]
@@ -160,7 +160,7 @@ mod tests {
         assert!(store
             .get_device(&dref)
             .unwrap()
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-1")));
 
         // Remove overlay
@@ -170,7 +170,7 @@ mod tests {
             device_id: device_id("dev-1"),
         };
         handler.handle_meta_message(msg, &mut store);
-        assert!(store.get_device(&dref).unwrap().meta_overlays.is_empty());
+        assert!(store.get_device(&dref).unwrap().meta_overlays().is_empty());
     }
 
     #[test]
@@ -210,7 +210,7 @@ mod tests {
         let dref = device_ref("dev-1");
         store.add(&dref, HomieDeviceStatus::Ready);
         handler.apply_pending_for_device(&dref, &mut store);
-        assert!(store.get_device(&dref).unwrap().meta_overlays.is_empty());
+        assert!(store.get_device(&dref).unwrap().meta_overlays().is_empty());
     }
 
     #[test]
@@ -252,7 +252,7 @@ mod tests {
         }
 
         let device = store.get_device(&dref).unwrap();
-        assert_eq!(device.meta_overlays.len(), 2);
+        assert_eq!(device.meta_overlays().len(), 2);
 
         // Remove only one provider
         let msg = MetaMessage::ProviderRemoval {
@@ -262,9 +262,9 @@ mod tests {
         handler.handle_meta_message(msg, &mut store);
 
         let device = store.get_device(&dref).unwrap();
-        assert_eq!(device.meta_overlays.len(), 1);
+        assert_eq!(device.meta_overlays().len(), 1);
         assert!(device
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-2")));
     }
 
@@ -301,11 +301,11 @@ mod tests {
         };
         handler.handle_meta_message(msg, &mut store);
 
-        assert!(store.get_device(&dref).unwrap().meta_overlays.is_empty());
+        assert!(store.get_device(&dref).unwrap().meta_overlays().is_empty());
         assert!(store
             .get_device(&other_dref)
             .unwrap()
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-1")));
     }
 
@@ -330,7 +330,7 @@ mod tests {
         assert!(store
             .get_device(&other_dref)
             .unwrap()
-            .meta_overlays
+            .meta_overlays()
             .is_empty());
 
         // The overlay still reaches its own device
@@ -340,7 +340,7 @@ mod tests {
         assert!(store
             .get_device(&dref)
             .unwrap()
-            .meta_overlays
+            .meta_overlays()
             .contains_key(&provider_id("provider-1")));
     }
 }
