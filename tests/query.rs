@@ -566,4 +566,30 @@ property:
         query.remove_materialized(&HomieDomain::Default, &id, &desc());
         assert!(!query.match_query(&prop));
     }
+
+    #[test]
+    fn materialized_query_keeps_same_device_id_in_other_domain() {
+        let mut query: MaterializedQuery =
+            serde_yaml_ng::from_str("node:\n  type: thermostat\n").unwrap();
+        let id = HomieID::new_const("dev-1");
+        let other: HomieDomain = "other".parse().unwrap();
+        let prop = |domain: &HomieDomain| {
+            PropertyRef::new(
+                domain.clone(),
+                id.clone(),
+                HomieID::new_const("thermostat"),
+                HomieID::new_const("set-temperature"),
+            )
+        };
+        query.add_materialized(&HomieDomain::Default, &id, &desc(), None);
+        query.add_materialized(&other, &id, &desc(), None);
+        assert!(query.match_query(&prop(&HomieDomain::Default)));
+        assert!(query.match_query(&prop(&other)));
+
+        // Re-evaluating one domain's device leaves the other domain's matches alone.
+        let no_match = DeviceDescriptionBuilder::new().build();
+        query.add_materialized(&other, &id, &no_match, None);
+        assert!(query.match_query(&prop(&HomieDomain::Default)));
+        assert!(!query.match_query(&prop(&other)));
+    }
 }
