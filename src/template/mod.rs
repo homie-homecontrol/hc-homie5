@@ -10,8 +10,8 @@
 //! |---|---|---|
 //! | `"{{ expr }}"` | any scalar string | exactly one placeholder (whitespace around allowed) yields the typed value; mixed text renders a string |
 //! | `{ use: name, with: {..} }` | any mapping position | replaced by the template body; in a list a list body is spliced |
-//! | `{ for_each: { query, sort_by }, use: name, with: {..} }` | list item, document root | one expansion of the template per element, spliced |
-//! | `{ for_each: { query, sort_by }, item: <body> }` | list item, document root | one expansion of `item` per element, spliced |
+//! | `{ for_each: { query \| items, sort_by }, use: name, with: {..} }` | list item, document root | one expansion of the template per element, spliced |
+//! | `{ for_each: { query \| items, sort_by }, item: <body> }` | list item, document root | one expansion of `item` per element, spliced |
 //! | `when: expr` key | list item, document root | the item is kept (without `when`) only if `expr` is truthy |
 //!
 //! Keys are never templated. Strings without `{{` are kept verbatim (`{%` and `{#` have no
@@ -32,11 +32,25 @@
 //!    that declares a parameter named `item` receives the element automatically unless `with`
 //!    sets it.
 //!
-//! # for_each order
+//! # for_each sources and order
 //!
-//! Elements come from [`ExpandContext::query`] and are sorted by the `sort_by` field path
-//! (dotted, e.g. `meta.room`; a list value sorts by its first element; numbers numerically,
-//! strings lexically), then by their `id` field. Missing or null values sort last.
+//! `for_each` takes exactly one of:
+//! - `query: <QueryDefinition>`: elements come from [`ExpandContext::query`] (the query is
+//!   expanded first, so it may use expressions);
+//! - `items: [ ... ]`: a literal list, expanded in the current scope like any other value (so
+//!   `items: ["{{ a }}", "{{ b }}"]` binds the evaluated values), any YAML value per element;
+//! - `items: "{{ expr }}"`: one placeholder that must evaluate to a list (params, outer
+//!   `item`, app scopes and app functions are visible).
+//!
+//! The current element is `item`; in a nested `for_each` the inner `item` shadows the outer.
+//! `sort_by` is a dotted field path (e.g. `meta.room`; a list value sorts by its first element;
+//! numbers numerically, strings lexically; missing or null values sort last). Query results
+//! are then ordered by their `id` field (store order is not deterministic); `items` keep list
+//! order, also for ties under `sort_by`.
+//!
+//! Missing keys are undefined, so `{{ item.label | default(item.id) }}` and
+//! `{{ item.label is defined }}` work under strict undefined; attribute access *on* an
+//! undefined value (`item.missing.x`) is an error.
 //!
 //! # Limits
 //!
