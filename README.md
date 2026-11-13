@@ -144,10 +144,13 @@ every present section must match. Queries deserialize from YAML text and from pa
   | Form | Holds when | Empty or missing list |
   |------|------------|-----------------------|
   | `any: <cond>` | at least one element matches | no |
-  | `all: <cond>` | every element matches | yes |
+  | `all: <cond>` | the list is non-empty and every element matches | no |
   | `none: <cond>` | no element matches | yes |
   | `first: <cond>` | the first element matches | no |
   | `empty: true` / `empty: false` | the list is empty / not empty | `true` / `false` |
+
+  `none:` holds on an empty or missing list. Since 0.19.1 `all:` no longer does (it used to
+  hold vacuously): "every room is Büro" is false for a device without rooms.
 
   List fields are `device.children`, `device.extensions` and each `$meta` annotation in
   `meta.annotations`.

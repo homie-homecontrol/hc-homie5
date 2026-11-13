@@ -21,11 +21,20 @@ fn any_matches_if_one_element_matches() {
 }
 
 #[test]
-fn all_matches_if_every_element_matches_and_holds_for_empty() {
+fn all_matches_a_non_empty_list_whose_elements_all_match() {
     let cond = parse("all: { pattern: '^x-' }");
+    assert!(cond.evaluate(&strings(&["x-1"])));
     assert!(cond.evaluate(&strings(&["x-1", "x-2"])));
     assert!(!cond.evaluate(&strings(&["x-1", "y-2"])));
-    assert!(cond.evaluate(&[]));
+}
+
+// Changed in 0.19.1: `all` no longer holds vacuously ("every room is Büro" is false without rooms).
+#[test]
+fn all_is_false_on_an_empty_or_missing_list() {
+    let cond = parse("all: { pattern: '^x-' }");
+    assert!(!cond.evaluate(&[]));
+    assert!(!cond.evaluate_option(None));
+    assert!(!cond.evaluate_option(Some(&[])));
 }
 
 #[test]
@@ -56,7 +65,7 @@ fn empty_checks_list_length() {
 fn missing_list_counts_as_empty() {
     assert!(!parse("any: a").evaluate_option(None));
     assert!(!parse("first: a").evaluate_option(None));
-    assert!(parse("all: a").evaluate_option(None));
+    assert!(!parse("all: a").evaluate_option(None));
     assert!(parse("none: a").evaluate_option(None));
     assert!(parse("empty: true").evaluate_option(None));
     assert!(parse("any: a").evaluate_option(Some(&strings(&["a"]))));

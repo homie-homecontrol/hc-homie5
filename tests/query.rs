@@ -420,7 +420,7 @@ mod meta {
         for meta in [Some(&meta), Some(&bare), None] {
             assert!(!matches("{ floor: { any: first } }", meta));
             assert!(!matches("{ floor: { first: first } }", meta));
-            assert!(matches("{ floor: { all: first } }", meta));
+            assert!(!matches("{ floor: { all: first } }", meta));
             assert!(matches("{ floor: { none: first } }", meta));
             assert!(matches("{ floor: { empty: true } }", meta));
             assert!(!matches("{ floor: { empty: false } }", meta));
