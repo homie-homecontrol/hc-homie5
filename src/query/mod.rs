@@ -147,10 +147,10 @@ impl DeviceQuery {
 
 /// Device-level `$meta` annotations a [`QueryDefinition`] can match against.
 ///
-/// With the `ext-meta` feature it is implemented for
-/// [`MetaDeviceOverlay`](homie5::extensions::meta::MetaDeviceOverlay) (pass the merged overlay,
-/// see `Device::merged_meta_overlay`) and for plain annotation maps
-/// ([`MetaEntries`](homie5::extensions::meta::MetaEntries)).
+/// With the `ext-meta` feature it is implemented for [`Device`](crate::model::Device) (reads its
+/// cached merged overlay; the usual choice), for a single
+/// [`MetaDeviceOverlay`](homie5::extensions::meta::MetaDeviceOverlay) and for plain annotation
+/// maps ([`MetaEntries`](homie5::extensions::meta::MetaEntries)).
 pub trait MetaAnnotations {
     /// Values of the device annotation `key`, or `None` when it is absent.
     /// A scalar annotation is a one-element slice.
@@ -165,6 +165,14 @@ impl MetaAnnotations for homie5::extensions::meta::MetaEntries {
             MetaValue::Text(value) => Some(std::slice::from_ref(value)),
             MetaValue::List(values) => Some(values.as_slice()),
         }
+    }
+}
+
+#[cfg(feature = "ext-meta")]
+impl MetaAnnotations for crate::model::Device {
+    /// Reads the cached merged overlay of all providers.
+    fn device_annotation(&self, key: &str) -> Option<&[String]> {
+        self.merged_meta_overlay().device_annotation(key)
     }
 }
 

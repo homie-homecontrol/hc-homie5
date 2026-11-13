@@ -9,8 +9,6 @@ use std::collections::{
 
 use crate::model::{DescriptionUpdate, Device, DeviceRemove, DeviceUpdate, PropertyValueEntry};
 
-use super::{AlertStore, PropertyValueStore};
-
 pub type DeviceMap = HashMap<HomieID, Device>;
 #[derive(Default, Clone)]
 pub struct DeviceStore(HashMap<HomieDomain, DeviceMap>);
@@ -42,15 +40,7 @@ impl DeviceStore {
                 DeviceUpdate::NoChange
             }
         } else {
-            let device = Device {
-                ident: device_ref.to_owned(),
-                state: status,
-                description: None,
-                prop_values: PropertyValueStore::new(),
-                alerts: AlertStore::new(),
-                #[cfg(feature = "ext-meta")]
-                meta_overlays: std::collections::HashMap::new(),
-            };
+            let device = Device::new(device_ref.to_owned(), status);
             if let Some(dev_map) = self.0.get_mut(device_ref.homie_domain()) {
                 dev_map.insert(device_ref.device_id().to_owned(), device);
             } else {

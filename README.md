@@ -153,9 +153,23 @@ every present section must match. Queries deserialize from YAML text and from pa
   `meta.annotations`.
 - `meta.annotations` matches device-level `$meta` annotations. A scalar annotation is a
   one-element list, a missing annotation an empty list. Annotation values are always strings,
-  so compare with `"true"`, not `true`. Pass the device's merged overlay
-  (`Device::merged_meta_overlay()`, feature `ext-meta`) to `match_query` / `add_materialized`;
-  with `None` every annotation counts as missing.
+  so compare with `"true"`, not `true`. Pass the device itself (`Some(&device)`, feature
+  `ext-meta`; it reads the cached merged overlay) or any other `MetaAnnotations` source to
+  `match_query` / `add_materialized`; with `None` every annotation counts as missing.
+
+## Device meta overlays (`ext-meta`)
+
+`Device` keeps one `$meta` overlay per provider and caches their merge (providers in id order;
+a key set by several providers becomes a deduplicated list):
+
+- `Device::new(ident, state)` creates a device; the other public fields can be set afterwards.
+- `meta_overlays()` returns the per-provider overlays (read-only).
+- `set_meta_overlay(provider, overlay)` / `remove_meta_overlay(&provider)` change them and
+  rebuild the cache; an identical overlay or an absent provider skips the rebuild.
+- `merged_meta_overlay()` returns the cached merge by reference, without allocating.
+
+`controller::MetaOverlayHandler` applies `MetaMessage`s through these methods, buffering
+overlays for devices that are not discovered yet.
 
 ```yaml
 device:
