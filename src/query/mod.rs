@@ -317,8 +317,9 @@ impl MaterializedQuery {
         device_desc: &HomieDeviceDescription,
         meta: Option<&dyn MetaAnnotations>,
     ) {
-        // Remove all refs belonging to the given device ID
-        self.mat_refs.retain(|prop_ref| prop_ref.device_id() != id);
+        // Remove all refs belonging to the given device (domain and ID)
+        self.mat_refs
+            .retain(|prop_ref| !(prop_ref.homie_domain() == domain && prop_ref.device_id() == id));
 
         let new_refs = self.query.match_query(domain, id, device_desc, meta);
         self.mat_refs.extend(new_refs); // Add new PropertyRefs to the HashSet
